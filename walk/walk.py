@@ -1,3 +1,4 @@
+import pinocchio
 import time
 import placo
 import argparse
@@ -19,6 +20,7 @@ args = parser.parse_args()
 
 DT = 0.005
 model_filename = "../models/sigmaban/robot.urdf"
+# model_filename = "../models/250226_DummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
 
 # Loading the robot
 robot = placo.HumanoidRobot(model_filename)

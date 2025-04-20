@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="ros2_control" params="robot_ip gripper">
+    <ros2_control name="prealpha" type="system">
+      <hardware>
+        <plugin>rby1_hardware_interface/RBY1System</plugin>
+        <param name="address">${robot_ip}</param>
+      </hardware>
+      <sensor name="left_ft_sensor">
+        <state_interface name="force.x"/>
+        <state_interface name="force.y"/>
+        <state_interface name="force.z"/>
+        <state_interface name="torque.x"/>
+        <state_interface name="torque.y"/>
+        <state_interface name="torque.z"/>
+      </sensor>
+      <sensor name="right_ft_sensor">
+        <state_interface name="force.x"/>
+        <state_interface name="force.y"/>
+        <state_interface name="force.z"/>
+        <state_interface name="torque.x"/>
+        <state_interface name="torque.y"/>
+        <state_interface name="torque.z"/>
+      </sensor>
+    </ros2_control>
+    <xacro:if value="${gripper == 'builtin'}">
+      <ros2_control name="rby1_gripper" type="system">
+        <hardware>
+          <plugin>rby1_hardware_interface/RBY1SystemGrippers</plugin>
+          <param name="usb_port">/dev/rby1_gripper</param>
+        </hardware>
+      </ros2_control>
+    </xacro:if>
+    <xacro:if value="${gripper == 'robotiq'}">
+      <xacro:include filename="$(find robotiq_description)/urdf/2f_85.ros2_control.xacro" />
+      <xacro:robotiq_gripper_ros2_control name="left_robotiq_gripper_hardware_interface"
+      prefix="left_" com_port="/dev/robotiq_left" />
+      <xacro:robotiq_gripper_ros2_control name="right_robotiq_gripper_hardware_interface"
+        prefix="right_" com_port="/dev/robotiq_right"/>
+    </xacro:if>
+  </xacro:macro>
+</robot>

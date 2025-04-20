@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="joint" params="joint_name">
+    <joint name="${joint_name}">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+    </joint>
+  </xacro:macro>
+  <xacro:macro name="ros2_control" params="gripper">
+    <ros2_control name="gripper_isaacsim" type="system">
+      <hardware>
+        <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+        <param name="joint_commands_topic">/gripper_joint_commands</param>
+        <param name="joint_states_topic">/isaacsim_joint_states</param>
+      </hardware>
+      <xacro:joint joint_name="right_robotiq_85_left_knuckle_joint" />
+      <xacro:joint joint_name="left_robotiq_85_left_knuckle_joint" />
+    </ros2_control>
+    <ros2_control name="torso_isaacsim" type="system">
+      <hardware>
+        <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+        <param name="joint_commands_topic">/torso_joint_commands</param>
+        <param name="joint_states_topic">/isaacsim_joint_states</param>
+      </hardware>
+      <xacro:joint joint_name="torso_0" />
+      <xacro:joint joint_name="torso_1" />
+      <xacro:joint joint_name="torso_2" />
+      <xacro:joint joint_name="torso_3" />
+      <xacro:joint joint_name="torso_4" />
+      <xacro:joint joint_name="torso_5" />
+    </ros2_control>
+    <ros2_control name="head_isaacsim" type="system">
+      <hardware>
+        <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+        <param name="joint_commands_topic">/head_joint_commands</param>
+        <param name="joint_states_topic">/isaacsim_joint_states</param>
+      </hardware>
+      <xacro:joint joint_name="head_0" />
+      <xacro:joint joint_name="head_1" />
+    </ros2_control>
+    <ros2_control name="right_arm_isaacsim" type="system">
+      <hardware>
+        <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+        <param name="joint_commands_topic">/right_arm_joint_commands</param>
+        <param name="joint_states_topic">/isaacsim_joint_states</param>
+      </hardware>
+      <xacro:joint joint_name="right_arm_0" />
+      <xacro:joint joint_name="right_arm_1" />
+      <xacro:joint joint_name="right_arm_2" />
+      <xacro:joint joint_name="right_arm_3" />
+      <xacro:joint joint_name="right_arm_4" />
+      <xacro:joint joint_name="right_arm_5" />
+      <xacro:joint joint_name="right_arm_6" />
+    </ros2_control>
+    <ros2_control name="left_arm_isaacsim" type="system">
+      <hardware>
+        <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+        <param name="joint_commands_topic">/left_arm_joint_commands</param>
+        <param name="joint_states_topic">/isaacsim_joint_states</param>
+      </hardware>
+      <xacro:joint joint_name="left_arm_0" />
+      <xacro:joint joint_name="left_arm_1" />
+      <xacro:joint joint_name="left_arm_2" />
+      <xacro:joint joint_name="left_arm_3" />
+      <xacro:joint joint_name="left_arm_4" />
+      <xacro:joint joint_name="left_arm_5" />
+      <xacro:joint joint_name="left_arm_6" />
+    </ros2_control>
+  </xacro:macro>
+</robot>

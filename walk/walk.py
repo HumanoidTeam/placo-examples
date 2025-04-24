@@ -1,4 +1,4 @@
-import pinocchio
+import pinocchio as pin  # Import Pinocchio
 import time
 import placo
 import argparse
@@ -24,6 +24,10 @@ model_filename = "../models/sigmaban/robot.urdf"
 
 # Loading the robot
 robot = placo.HumanoidRobot(model_filename)
+
+# Add these lines to grab the Pinocchio model and create a fresh Data container
+model = robot.model  # Pinocchio Model (no parentheses)
+data = pin.Data(model)  # Pinocchio Data container
 
 # Walk parameters - if double_support_ratio is not set to 0, should be greater than replan_frequency
 parameters = placo.HumanoidParameters()
@@ -127,6 +131,13 @@ else:
     print("No visualization selected, use either -p or -m")
     exit()
 
+# Initialize logs for joint kinematics and torques
+q_log = []
+qdot_log = []
+qddot_log = []
+torque_log = []
+time_log = []
+
 # Timestamps
 start_t = time.time()
 initial_delay = -2.0 if args.pybullet or args.meshcat else 0.0
@@ -134,15 +145,34 @@ t = initial_delay
 last_display = time.time()
 last_replan = 0
 
-while True:
+# Run the loop for a fixed duration (e.g., 10 seconds)
+import time
+start_time = time.time()
+while time.time() - start_time < 10:  # Run for 10 seconds
     # Updating the QP tasks from planned trajectory
     tasks.update_tasks_from_trajectory(trajectory, t)
 
-    # Invoking the IK QP solver
-    robot.update_kinematics()
+    # 1) Solve the kinematic QP and get joint velocities
     qd_sol = solver.solve(True)
 
-    # Ensuring the robot is kinematically placed on the floor on the proper foot to avoid integration drifts
+    # 2) Advance PlaCo’s internal state
+    robot.update_kinematics()
+
+    # 3) Log position & velocity
+    q_log.append(robot.state.q.copy())
+    qdot_log.append(qd_sol.copy())
+
+    # 4) Once you have two velocity samples, finite‐difference to compute acceleration
+    if len(qdot_log) >= 2:
+        qdd = (qdot_log[-1] - qdot_log[-2]) / DT
+        qddot_log.append(qdd)
+
+        # 5) Compute torques using inverse dynamics via Pinocchio RNEA
+        tau = pin.rnea(model, data, q_log[-1], qdot_log[-1], qdd)
+        torque_log.append(tau.copy())
+        time_log.append(t)
+
+    # Ensuring the robot is kinematically placed on the floor on the proper foot
     if not trajectory.support_is_both(t):
         robot.update_support_side(str(trajectory.support_side(t)))
         robot.ensure_on_floor()
@@ -197,3 +227,44 @@ while True:
     t += DT
     while time.time() + initial_delay < start_t + t:
         time.sleep(1e-3)
+
+# Save torque data to a CSV file after exiting the loop
+import csv
+output_file = "/home/sasa/Software/hmnd-robot/walk_torque_data.csv"
+with open(output_file, mode="w", newline="") as file:
+    writer = csv.writer(file)
+    writer.writerow(["time"] + list(robot.joint_names()))  # Header row
+    for i, tau in enumerate(torque_log):
+        writer.writerow([time_log[i]] + tau.tolist())
+print(f"Torque data saved to {output_file}")
+
+# Plot joint torques after the loop exits
+import matplotlib.pyplot as plt
+import numpy as np
+
+T = np.array(time_log)
+Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+
+# Plot all joint torques
+plt.figure()
+for i, name in enumerate(robot.joint_names()):
+    plt.plot(T, Tau[i], label=name)
+plt.xlabel("time [s]")
+plt.ylabel("torque [Nm]")
+plt.legend(loc="upper right", ncol=2, fontsize="small")
+plt.title("Joint torques during motion")
+plt.show()
+
+# Plot only hip torques
+joint_names = list(robot.joint_names())  # Convert to Python list
+hip_joints = [name for name in joint_names if "hip" in name.lower()]
+hip_indices = [joint_names.index(name) for name in hip_joints]
+
+plt.figure()
+for i in hip_indices:
+    plt.plot(T, Tau[i], label=joint_names[i])
+plt.xlabel("time [s]")
+plt.ylabel("torque [Nm]")
+plt.legend(loc="upper right", fontsize="small")
+plt.title("Hip joint torques during motion")
+plt.show()

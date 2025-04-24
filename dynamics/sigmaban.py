@@ -1,3 +1,4 @@
+import pinocchio
 import numpy as np
 from ischedule import schedule, run_loop
 import placo
@@ -91,6 +92,9 @@ solver.remove_contact(puppet)
 
 viz = robot_viz(robot)
 
+# Initialize torque and time logs
+torque_log = []
+time_log = []
 
 @schedule(interval=(1 / view_fps))
 def loop():
@@ -100,22 +104,57 @@ def loop():
         t += solver.dt
         t = t % 10
 
+        # Update targets
         com_task.target_world = com_trajectory.pos(t)
         right_foot_target = rightFoot_trajectory.pos(t)
         rightFoot_task.position().target_world = right_foot_target
         right_contact.active = bool(right_foot_target[2] < 1e-3)
 
         robot.update_kinematics()
-        solver.solve(True)
+        result = solver.solve(True)  # Capture solver result
 
-    # Viewing robot and contacts
+    # Log time and torques
+    time_log.append(t)
+    torque_log.append(result.tau.copy())
+
+    # Display robot and contacts
     viz.display(robot.state.q)
     contacts_viz(solver, ratio=3e-3, radius=0.01)
 
-    # Viewing the robot's CoM on the ground
+    # Visualize CoM on the ground
     com = robot.com_world()
     com[2] = 0.0
     point_viz("com", com)
 
+# Run the loop for a fixed duration (e.g., 10 seconds)
+import time
+start_time = time.time()
+while time.time() - start_time < 10:  # Run for 10 seconds
+    loop()  # Directly call the loop function
 
-run_loop()
+# Save torque data to a CSV file
+# import csv
+# output_file = "/home/sasa/Software/hmnd-robot/torque_data.csv"
+# with open(output_file, mode="w", newline="") as file:
+#     writer = csv.writer(file)
+#     writer.writerow(["time"] + list(robot.joint_names()))  # Convert to Python list
+#     for time, torque in zip(time_log, torque_log):
+#         writer.writerow([time] + torque.tolist())
+
+# print(f"Torque data saved to {output_file}")
+
+# Plot joint torques after the loop exits
+import matplotlib.pyplot as plt
+import numpy as np
+
+T = np.array(time_log)
+Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+
+plt.figure()
+for i, name in enumerate(robot.joint_names()):
+    plt.plot(T, Tau[i], label=name)
+plt.xlabel('time [s]')
+plt.ylabel('torque [Nm]')
+plt.legend(loc='upper right', ncol=2, fontsize='small')
+plt.title('Joint torques during motion')
+plt.show()

@@ -6,7 +6,7 @@ from placo_utils.visualization import robot_viz, robot_frame_viz
 from placo_utils.tf import tf
 
 # Loading the robot
-robot = placo.RobotWrapper("../models/prealpha_description/urdf/model.urdf", placo.Flags.ignore_collisions)
+robot = placo.RobotWrapper("../../../../ros_nodes/core/prealpha_description/urdf/model.urdf", placo.Flags.ignore_collisions)
 viz = robot_viz(robot)
 
 # Creating the solver

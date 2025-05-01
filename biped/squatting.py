@@ -43,6 +43,15 @@ com_init = robot.com_world().copy()  # Get the initial CoM position
 com_task = solver.add_com_task(com_init)
 com_task.configure("com", "soft", 1.0)
 
+# ---- TORSO ORIENTATION TASK ----
+# Add a task to keep the torso upright by maintaining its orientation
+torso_orientation = solver.add_orientation_task("torso_2023", np.eye(3))  # Goal is identity rotation (upright)
+torso_orientation.configure("torso_orientation", "soft", 1.0)
+
+# ---- REGULARIZATION TASK ----
+# Add a custom regularization task to minimize joint movements
+# regularization_task = solver.add_regularization_task(1e-4)
+
 # Main loop: Keep the robot standing with sinusoidal CoM motion
 print("Robot is standing with feet fixed and CoM moving sinusoidally downward. Press Ctrl+C to exit.")
 try:
@@ -51,6 +60,9 @@ try:
         # Update CoM task target with sinusoidal motion
         z_offset = -0.05 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2  # 5 cm downward amplitude, 0.5 Hz frequency
         com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])  # Update CoM position
+
+        # Update torso orientation to remain upright
+        torso_orientation.R_world_frame = np.eye(3)
 
         # Solve QP
         solver.solve(True)

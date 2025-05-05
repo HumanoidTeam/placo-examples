@@ -7,7 +7,7 @@ import placo
 import argparse
 import time
 import numpy as np
-from placo_utils.visualization import robot_viz, frame_viz
+from placo_utils.visualization import robot_viz, frame_viz,contacts_viz
 from placo_utils.tf import tf  # Correct import for transformation utilities
 
 # Parse arguments for visualization
@@ -70,6 +70,22 @@ posture_regularization_task = solver.add_joints_task()
 posture_regularization_task.set_joints({joint: 0.0 for joint in robot.joint_names()})
 posture_regularization_task.configure("posture", "soft", 1e-6)
 
+# ---- FRAME TASKS FOR HANDS ----
+# Use the correct hand end-effector links for the hands
+# Add orientation task for the left hand to maintain its current orientation
+# T_left_hand = robot.get_T_world_frame("radius_v2")  # Get initial transform of the left hand end-effector
+# left_hand_orientation = solver.add_orientation_task("radius_v2", T_left_hand[:3, :3])  # Keep current orientation
+# left_hand_orientation.configure("left_hand_orientation", "soft", 1.0)
+
+# Add a frame task for the right hand to keep it in front of the robot
+# T_right_hand = robot.get_T_world_frame("radius_v2_2")  # Get initial transform of the right hand end-effector
+# right_hand_frame = solver.add_frame_task("radius_v2_2", T_right_hand)
+# right_hand_frame.configure("right_hand", "soft", 1.0)
+
+# # Set the target position for the right hand to stay in front of the robot
+# right_hand_target = T_right_hand.copy()
+# right_hand_target[:3, 3] += np.array([0.3, 0.0, 0.0])  # Move 30 cm forward
+
 # Enable joint, velocity, and torque limits
 solver.enable_joint_limits(True)
 solver.enable_velocity_limits(True)
@@ -107,6 +123,9 @@ try:
             frame_viz("left_foot_frame", left_frame.T_world_frame)
             frame_viz("right_foot_frame", right_frame.T_world_frame)
             frame_viz("com_frame", tf.translation_matrix(com_task.target_world))  # Convert CoM to 4x4 matrix
+
+            # Visualize forces under the feet using contact forces from the solver
+            contacts_viz(solver, ratio=3e-3, radius=0.01)
 
         # Maintain real time
         time.sleep(DT)

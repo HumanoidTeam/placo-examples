@@ -23,7 +23,7 @@ DT = 0.005  # Timestep [s]
 model_filename = "../models/sigmaban/robot.urdf"
 robot = placo.HumanoidRobot(model_filename)
 # solver = placo.KinematicsSolver(robot)
-robot.update_kinematics()
+# robot.update_kinematics()
 solver = placo.DynamicsSolver(robot)
 # Setting the solver delta time to 1ms
 solver.dt = 0.005
@@ -70,6 +70,11 @@ posture_regularization_task = solver.add_joints_task()
 posture_regularization_task.set_joints({joint: 0.0 for joint in robot.joint_names()})
 posture_regularization_task.configure("posture", "soft", 1e-6)
 
+external_wrench_left  = solver.add_external_wrench_contact("radius_v2", "world")
+external_wrench_right = solver.add_external_wrench_contact("radius_v2_2", "world")
+external_wrench_left.w_ext  = np.array([0.0, 0.0, -10.0, 0.0, 0.0, 0.0])
+external_wrench_right.w_ext = np.array([0.0, 0.0, -10.0, 0.0, 0.0, 0.0])
+
 # ---- FRAME TASKS FOR HANDS ----
 # Use the correct hand end-effector links for the hands
 # Add orientation task for the left hand to maintain its current orientation
@@ -91,6 +96,14 @@ solver.enable_joint_limits(True)
 solver.enable_velocity_limits(True)
 solver.enable_torque_limits(True)
 
+# Initializing the robot with a puppet contact
+puppet = solver.add_puppet_contact()
+for k in range(1000):
+    robot.add_q_noise(1e-3)  # adding noise to exit singularities
+    solver.solve(True)
+    robot.update_kinematics()
+solver.remove_contact(puppet)
+
 # Initialize torque and time logs
 torque_log = []
 time_log = []
@@ -106,7 +119,8 @@ try:
 
         # Update torso orientation to remain upright
         torso_orientation.R_world_frame = np.eye(3)
-
+        external_wrench_left.w_ext = np.array([0.0, 0.0, -40.0, 0.0, 0.0, 0.0])
+        external_wrench_right.w_ext = np.array([0.0, 0.0, -40.0, 0.0, 0.0, 0.0])
         # Solve dynamics
         result = solver.solve(True)
 

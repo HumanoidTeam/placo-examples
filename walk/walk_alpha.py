@@ -204,7 +204,7 @@ while time.time() - start_time < 10:  # Run for 10 seconds
     # If enough time elapsed and we can replan, do the replanning
     if (t - last_replan > parameters.replan_timesteps * parameters.dt() and walk.can_replan_supports(trajectory, t)):
         # Replanning footsteps from current trajectory
-        supports = walk.replan_supports(repetitive_footsteps_planner, trajectory, t, t)
+        supports = walk.replan_supports(repetitive_footsteps_planner, trajectory, t, last_replan)
 
         # Replanning CoM trajectory, yielding a new trajectory we can switch to
         new_trajectory = walk.replan(supports, trajectory, t)

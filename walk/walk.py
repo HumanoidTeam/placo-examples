@@ -299,8 +299,9 @@ if args.pybullet:
 
     # Plot all PyBullet joint torques
     plt.figure()
-    for i in range(PyBullet_Tau.shape[0]):
-        plt.plot(T, PyBullet_Tau[i], label=f"joint_{i}")
+    joint_names = list(robot.joint_names())  # Get joint names from the robot model
+    for i, name in enumerate(joint_names[:PyBullet_Tau.shape[0]]):  # Use joint names for legend
+        plt.plot(T, PyBullet_Tau[i], label=name)
     plt.xlabel("time [s]")
     plt.ylabel("torque [Nm]")
     plt.legend(loc="upper right", ncol=2, fontsize="small")

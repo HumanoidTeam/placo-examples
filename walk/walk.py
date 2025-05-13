@@ -122,8 +122,13 @@ if args.pybullet:
     # Loading the PyBullet simulation
     import pybullet as p
     from onshape_to_robot.simulation import Simulation
-
+    
     sim = Simulation(model_filename, realTime=True, dt=DT)
+    # p.getNumJoints()
+    actual_torque_log = []  # Log for PyBullet-applied torques
+    # joint_indices = sim.getJoints()
+    # print("Number of joints:", p.getNumJoints(1))
+    # print("Joint indices:", joint_indices, "Size of joint_indices:", len(joint_indices))
 elif args.meshcat:
     # Starting Meshcat viewer
     viz = robot_viz(robot)
@@ -156,7 +161,7 @@ last_replan = 0
 
 # Run the loop for a fixed duration (e.g., 10 seconds)
 start_time = time.time()
-while time.time() - start_time < 10:  # Run for 10 seconds
+while time.time() - start_time < 5:  # Run for 10 seconds
     # Updating the QP tasks from planned trajectory
     tasks.update_tasks_from_trajectory(trajectory, t)
 
@@ -243,6 +248,17 @@ while time.time() - start_time < 10:  # Run for 10 seconds
         applied = sim.setJoints(joints)
         sim.tick()
 
+        # Get all movable joint indices
+        num_joints = p.getNumJoints(1)  # Assuming robot_id is 1
+        joint_indices = [
+            i for i in range(num_joints) if p.getJointInfo(1, i)[2] != p.JOINT_FIXED
+        ]
+
+        # Get joint states and extract torques
+        joint_states = p.getJointStates(1, joint_indices)
+        applied_torques = [state[3] for state in joint_states]
+        actual_torque_log.append(applied_torques)
+
     # Updating meshcat display periodically
     elif args.meshcat:
         if time.time() - last_display > 0.03:
@@ -262,60 +278,90 @@ while time.time() - start_time < 10:  # Run for 10 seconds
     while time.time() + initial_delay < start_t + t:
         time.sleep(1e-3)
 
-# Save torque data to a CSV file after exiting the loop
-import csv
-output_file = "/home/sasa/Software/hmnd-robot/walk_torque_data.csv"
-with open(output_file, mode="w", newline="") as file:
-    writer = csv.writer(file)
-    writer.writerow(["time"] + list(robot.joint_names()))  # Header row
-    for i, tau in enumerate(torque_log):
-        writer.writerow([time_log[i]] + tau.tolist())
-print(f"Torque data saved to {output_file}")
+if args.pybullet:
+    # Save PyBullet torque data to a CSV file after exiting the loop
+    import csv
+    pybullet_output_file = "/home/sasa/Software/hmnd-robot/pybullet_torque_data.csv"
+    min_length = min(len(time_log), len(actual_torque_log))  # Ensure synchronized lengths
+    with open(pybullet_output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["time"] + [f"joint_{i}" for i in range(len(actual_torque_log[0]))])  # Header row
+        for i in range(min_length):
+            writer.writerow([time_log[i]] + actual_torque_log[i])
+    print(f"PyBullet torque data saved to {pybullet_output_file}")
 
-# Plot joint torques after the loop exits
-import matplotlib.pyplot as plt
-import numpy as np
+    # Plot PyBullet joint torques after the loop exits
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-T = np.array(time_log)
-Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+    T = np.array(time_log[:min_length])  # Use synchronized time_log
+    PyBullet_Tau = np.array(actual_torque_log[:min_length]).T  # shape: (n_joints, len(T))
 
-# Plot all joint torques
-plt.figure()
-for i, name in enumerate(robot.joint_names()):
-    plt.plot(T, Tau[i], label=name)
-plt.xlabel("time [s]")
-plt.ylabel("torque [Nm]")
-plt.legend(loc="upper right", ncol=2, fontsize="small")
-plt.title("Joint torques during motion")
-plt.show()
+    # Plot all PyBullet joint torques
+    plt.figure()
+    for i in range(PyBullet_Tau.shape[0]):
+        plt.plot(T, PyBullet_Tau[i], label=f"joint_{i}")
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.title("PyBullet Joint Torques during Motion")
+    plt.show()
 
-# Plot only hip torques
-joint_names = list(robot.joint_names())  # Convert to Python list
-hip_joints = [name for name in joint_names if "hip" in name.lower()]
-hip_indices = [joint_names.index(name) for name in hip_joints]
+if args.meshcat:
+    # Save torque data to a CSV file after exiting the loop
+    import csv
+    output_file = "/home/sasa/Software/hmnd-robot/walk_torque_data.csv"
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["time"] + list(robot.joint_names()))  # Header row
+        for i, tau in enumerate(torque_log):
+            writer.writerow([time_log[i]] + tau.tolist())
+    print(f"Torque data saved to {output_file}")
 
-plt.figure()
-for i in hip_indices:
-    plt.plot(T, Tau[i], label=joint_names[i])
-plt.xlabel("time [s]")
-plt.ylabel("torque [Nm]")
-plt.legend(loc="upper right", fontsize="small")
-plt.title("Hip joint torques during motion")
-plt.show()
+    # Plot joint torques after the loop exits
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-# Plot contact forces after the loop exits
-f_left_log = np.array(f_left_log)
-f_right_log = np.array(f_right_log)
+    T = np.array(time_log)
+    Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
 
-plt.figure()
-plt.plot(T, f_left_log[:, 0], label="Left Foot Fx")
-plt.plot(T, f_left_log[:, 1], label="Left Foot Fy")
-plt.plot(T, f_left_log[:, 2], label="Left Foot Fz")
-plt.plot(T, f_right_log[:, 0], label="Right Foot Fx")
-plt.plot(T, f_right_log[:, 1], label="Right Foot Fy")
-plt.plot(T, f_right_log[:, 2], label="Right Foot Fz")
-plt.xlabel("time [s]")
-plt.ylabel("force [N]")
-plt.legend(loc="upper right", fontsize="small")
-plt.title("Contact forces during motion")
-plt.show()
+    # Plot all joint torques
+    plt.figure()
+    for i, name in enumerate(robot.joint_names()):
+        plt.plot(T, Tau[i], label=name)
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.title("Joint torques during motion")
+    plt.show()
+
+    # Plot only hip torques
+    joint_names = list(robot.joint_names())  # Convert to Python list
+    hip_joints = [name for name in joint_names if "hip" in name.lower()]
+    hip_indices = [joint_names.index(name) for name in hip_joints]
+
+    plt.figure()
+    for i in hip_indices:
+        plt.plot(T, Tau[i], label=joint_names[i])
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", fontsize="small")
+    plt.title("Hip joint torques during motion")
+    plt.show()
+
+    # Plot contact forces after the loop exits
+    f_left_log = np.array(f_left_log)
+    f_right_log = np.array(f_right_log)
+
+    plt.figure()
+    plt.plot(T, f_left_log[:, 0], label="Left Foot Fx")
+    plt.plot(T, f_left_log[:, 1], label="Left Foot Fy")
+    plt.plot(T, f_left_log[:, 2], label="Left Foot Fz")
+    plt.plot(T, f_right_log[:, 0], label="Right Foot Fx")
+    plt.plot(T, f_right_log[:, 1], label="Right Foot Fy")
+    plt.plot(T, f_right_log[:, 2], label="Right Foot Fz")
+    plt.xlabel("time [s]")
+    plt.ylabel("force [N]")
+    plt.legend(loc="upper right", fontsize="small")
+    plt.title("Contact forces during motion")
+    plt.show()

@@ -20,6 +20,7 @@ args = parser.parse_args()
 
 DT = 0.005
 model_filename = "../models/sigmaban/robot.urdf"
+# model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
 # model_filename = "../models/250226_DummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
 
 # Loading the robot
@@ -102,7 +103,7 @@ print("Initial position reached")
 repetitive_footsteps_planner = placo.FootstepsPlannerRepetitive(parameters)
 d_x = 0.1
 d_y = 0.0
-d_theta = 0.2
+d_theta = 0.0
 nb_steps = 10
 repetitive_footsteps_planner.configure(d_x, d_y, d_theta, nb_steps)
 
@@ -138,6 +139,14 @@ qddot_log = []
 torque_log = []
 time_log = []
 
+# Initialize logs for contact forces
+f_left_log = []
+f_right_log = []
+
+# Get frame indices for the left and right soles
+left_sole_frame = model.getFrameId("left_foot_frame")
+right_sole_frame = model.getFrameId("right_foot_frame")
+
 # Timestamps
 start_t = time.time()
 initial_delay = -2.0 if args.pybullet or args.meshcat else 0.0
@@ -146,7 +155,6 @@ last_display = time.time()
 last_replan = 0
 
 # Run the loop for a fixed duration (e.g., 10 seconds)
-import time
 start_time = time.time()
 while time.time() - start_time < 10:  # Run for 10 seconds
     # Updating the QP tasks from planned trajectory
@@ -167,9 +175,35 @@ while time.time() - start_time < 10:  # Run for 10 seconds
         qdd = (qdot_log[-1] - qdot_log[-2]) / DT
         qddot_log.append(qdd)
 
-        # 5) Compute torques using inverse dynamics via Pinocchio RNEA
-        tau = pin.rnea(model, data, q_log[-1], qdot_log[-1], qdd)
-        torque_log.append(tau.copy())
+        # 5) Compute quasi-static contact forces
+        Jl = pin.computeFrameJacobian(model, data, robot.state.q, left_sole_frame, pin.LOCAL_WORLD_ALIGNED)[:3, :]
+        Jr = pin.computeFrameJacobian(model, data, robot.state.q, right_sole_frame, pin.LOCAL_WORLD_ALIGNED)[:3, :]
+        Jc = np.vstack([Jl, Jr])  # 6×n_joints
+
+        rhs = pin.rnea(model, data, robot.state.q, qdot_log[-1], qdd)  # Net torque
+        f_contact, *_ = np.linalg.lstsq(Jc.T, rhs, rcond=None)
+        f_left, f_right = f_contact[:3], f_contact[3:]
+
+        # Log contact forces
+        f_left_log.append(f_left)
+        f_right_log.append(f_right)
+
+        # 6) Build full Force (torque, force) at each contact frame
+        F_left = pin.Force.Zero()
+        F_left.linear = f_left
+        F_right = pin.Force.Zero()
+        F_right.linear = f_right
+
+        # 7) Create an external-forces array
+        f_ext = [pin.Force.Zero()] * model.njoints
+        joint_id_left = model.frames[left_sole_frame].parent
+        joint_id_right = model.frames[right_sole_frame].parent
+        f_ext[joint_id_left] = F_left
+        f_ext[joint_id_right] = F_right
+
+        # 8) Compute torques using RNEA with external forces
+        tau_with_contacts = pin.rnea(model, data, robot.state.q, qdot_log[-1], qdd, f_ext)
+        torque_log.append(tau_with_contacts.copy())
         time_log.append(t)
 
     # Ensuring the robot is kinematically placed on the floor on the proper foot
@@ -267,4 +301,21 @@ plt.xlabel("time [s]")
 plt.ylabel("torque [Nm]")
 plt.legend(loc="upper right", fontsize="small")
 plt.title("Hip joint torques during motion")
+plt.show()
+
+# Plot contact forces after the loop exits
+f_left_log = np.array(f_left_log)
+f_right_log = np.array(f_right_log)
+
+plt.figure()
+plt.plot(T, f_left_log[:, 0], label="Left Foot Fx")
+plt.plot(T, f_left_log[:, 1], label="Left Foot Fy")
+plt.plot(T, f_left_log[:, 2], label="Left Foot Fz")
+plt.plot(T, f_right_log[:, 0], label="Right Foot Fx")
+plt.plot(T, f_right_log[:, 1], label="Right Foot Fy")
+plt.plot(T, f_right_log[:, 2], label="Right Foot Fz")
+plt.xlabel("time [s]")
+plt.ylabel("force [N]")
+plt.legend(loc="upper right", fontsize="small")
+plt.title("Contact forces during motion")
 plt.show()

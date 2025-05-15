@@ -7,7 +7,7 @@ import placo
 import argparse
 import time
 import numpy as np
-from placo_utils.visualization import robot_viz, frame_viz
+from placo_utils.visualization import robot_viz, frame_viz, contacts_viz
 from placo_utils.tf import tf  # Correct import for transformation utilities
 
 # Parse arguments for visualization
@@ -23,9 +23,69 @@ DT = 0.005  # Timestep [s]
 model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
 # model_filename = "../models/sigmaban/robot.urdf"
 # model_filename = "../models/dummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
-# robot = placo.RobotWrapper(model_filename, placo.Flags.ignore_collisions)
 robot = placo.HumanoidRobot(model_filename, placo.Flags.ignore_collisions)
 
+# Set gravity explicitly
+robot.set_gravity(np.array([0.0, 0.0, -9.81]))
+
+# Kinematics solver for initial posture
+# Add these lines to grab the Pinocchio model and create a fresh Data container
+model = robot.model  # Pinocchio Model (no parentheses)
+data = pin.Data(model)  # Pinocchio Data container
+
+# Walk parameters - if double_support_ratio is not set to 0, should be greater than replan_frequency
+parameters = placo.HumanoidParameters()
+
+# Timing parameters
+parameters.single_support_duration = 0.6  # Duration of single support phase [s]
+parameters.single_support_timesteps = 10  # Number of planning timesteps per single support phase
+parameters.double_support_ratio = 0.3  # Ratio of double support (0.0 to 1.0)
+parameters.startend_double_support_ratio = 1.5  # Ratio duration of supports for starting and stopping walk
+parameters.planned_timesteps = 60  # Number of timesteps planned ahead
+parameters.replan_timesteps = 12  # Replanning each n timesteps
+
+# Posture parameters
+
+parameters.walk_com_height = 0.95 #robot.com_world().copy()[2]  # Constant height for the CoM [m]
+parameters.walk_foot_height = 0.04  # Height of foot rising while walking [m]
+parameters.walk_trunk_pitch = 0.05  # Trunk pitch angle [rad]
+parameters.walk_foot_rise_ratio = 0.2  # Time ratio for the foot swing plateau (0.0 to 1.0)
+
+# Feet parameters
+parameters.foot_length = 0.1576  # Foot length [m]
+parameters.foot_width = 0.092  # Foot width [m]
+parameters.feet_spacing = 0.35  # Lateral feet spacing [m]
+parameters.zmp_margin = 0.02  # ZMP margin [m]
+parameters.foot_zmp_target_x = 0.0  # Reference target ZMP position in the foot [m]
+parameters.foot_zmp_target_y = 0.0  # Reference target ZMP position in the foot [m]
+
+# Limit parameters
+parameters.walk_max_dtheta = 1  # Maximum dtheta per step [rad]
+parameters.walk_max_dy = 0.04  # Maximum dy per step [m]
+parameters.walk_max_dx_forward = 0.08  # Maximum dx per step forward [m]
+parameters.walk_max_dx_backward = 0.03  # Maximum dx per step backward [m]
+
+# Creating the kinematics solver
+solver_kin = placo.KinematicsSolver(robot)
+solver_kin.enable_velocity_limits(True)
+solver_kin.dt = DT
+
+# Creating the walk QP tasks
+tasks = placo.WalkTasks()
+tasks.initialize_tasks(solver_kin, robot)
+
+tasks.reach_initial_pose(
+    np.eye(4),
+    parameters.feet_spacing,
+    parameters.walk_com_height,
+    parameters.walk_trunk_pitch,
+)
+
+robot.update_kinematics()
+
+
+
+# Dynamic Solver after bended-knee posture
 solver = placo.DynamicsSolver(robot)
 solver.dt = 0.005
 # Visualization setup
@@ -33,13 +93,18 @@ viz = robot_viz(robot) if args.meshcat else None
 
 # ---- FRAME TASKS FOR FEET ----
 # Freeze both feet: add frame tasks for detected frames
-T_left = placo.flatten_on_floor(robot.get_T_world_frame("left_foot"))
-left_frame = solver.add_frame_task("left_foot", T_left)
-left_frame.configure("left_foot", "hard", 1e3, 1e3)
+# T_left = placo.flatten_on_floor(robot.get_T_world_frame("left_foot"))
+# left_frame = solver.add_frame_task("left_foot", T_left)
+# left_frame.configure("left_foot", "hard", 1e3, 1e3)
 
-T_right = placo.flatten_on_floor(robot.get_T_world_frame("right_foot"))
-right_frame = solver.add_frame_task("right_foot", T_right)
-right_frame.configure("right_foot", "hard", 1e3, 1e3)
+# T_right = placo.flatten_on_floor(robot.get_T_world_frame("right_foot"))
+# right_frame = solver.add_frame_task("right_foot", T_right)
+# right_frame.configure("right_foot", "hard", 1e3, 1e3)
+
+T_world_left = placo.flatten_on_floor(robot.get_T_world_left())
+left_frame = solver.add_frame_task("left_foot", T_world_left)
+T_world_right = placo.flatten_on_floor(robot.get_T_world_right())
+right_frame = solver.add_frame_task("right_foot", T_world_right)
 
 # ---- CONTACTS FOR FEET ----
 # Add planar contacts for both feet
@@ -61,8 +126,8 @@ com_task.configure("com", "soft", 1.0)
 
 # ---- TORSO ORIENTATION TASK ----
 # Add a task to keep the torso upright by maintaining its orientation
-# torso_orientation = solver.add_orientation_task("trunk", np.eye(3))  # Goal is identity rotation (upright)
-# torso_orientation.configure("trunk", "soft", 1.0)
+torso_orientation = solver.add_orientation_task("trunk", np.eye(3))  # Goal is identity rotation (upright)
+torso_orientation.configure("trunk", "soft", 1.0)
 
 # Define a target rotation matrix that allows free rotation around x and y axes
 target_rotation = np.eye(3)  # Identity matrix for upright orientation
@@ -77,6 +142,9 @@ target_rotation[1, 1] = 0  # Free rotation around y-axis
 # posture_regularization_task = solver.add_joints_task()
 # posture_regularization_task.set_joints({joint: 0.0 for joint in robot.joint_names()})
 # posture_regularization_task.configure("posture", "soft", 1e-6)
+
+external_wrench_trunk  = solver.add_external_wrench_contact("trunk", "world")
+external_wrench_trunk.w_ext  = np.array([0.0, 0.0, -10.0, 0.0, 0.0, 0.0])
 
 # Enable joint, velocity, and torque limits
 solver.enable_joint_limits(True)
@@ -97,25 +165,52 @@ viz = robot_viz(robot) if args.meshcat else None
 # Initialize torque and time logs
 torque_log = []
 time_log = []
-# Main loop: Visualize the robot
-print("Visualizing the robot. Press Ctrl+C to exit.")
+
+# Initialize force logs
+left_foot_force_log = []
+right_foot_force_log = []
+
+# Main loop: First reach the initial posture for 5 seconds
+print("Reaching initial posture for 5 seconds...")
 try:
-    t = 0  # Time variable for sinusoidal motion
+    t = 0  # Time variable
+    while t < 0.25:  # Run for 0.25 seconds
+        # Solve kinematics to reach the initial pose
+        solver_kin.solve(True)
+        robot.update_kinematics()
+
+        # Visualization
+        if viz:
+            viz.display(robot.state.q)
+            frame_viz("left_foot_frame", left_frame.T_world_frame)
+            frame_viz("right_foot_frame", right_frame.T_world_frame)
+
+        # Maintain real time
+        time.sleep(DT)
+        t += DT  # Increment time
+except KeyboardInterrupt:
+    print("Exiting.")
+
+# Main loop: Start squatting motion
+print("Starting squatting motion. Press Ctrl+C to exit.")
+try:
+    t = 0  # Reset time variable for squatting motion
     while True:
         # Update CoM task target with sinusoidal motion
-        # z_offset = -0.05 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2  # 5 cm downward amplitude, 0.5 Hz frequency
-        # com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])  # Update CoM position
-        # Solve QP
+        z_offset = -0.20 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2
+        y_offset = -0.0 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2
+        com_task.target_world = com_init + np.array([0.0, y_offset, z_offset])  # Update CoM position
+        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -40.0, 0.0, 0.0, 0.0])
         # Solve dynamics
-
-        z_offset = -0.20 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2  # 10 cm downward amplitude, 0.5 Hz frequency
-        com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])  # Update CoM position
-
         result = solver.solve(True)
 
         # Log time and torques
         time_log.append(t)
         torque_log.append(result.tau.copy())
+
+        # Log external forces on the feet
+        left_foot_force_log.append(left_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
+        right_foot_force_log.append(right_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
 
         # Update kinematics
         robot.update_kinematics()
@@ -126,6 +221,9 @@ try:
             frame_viz("left_foot_frame", left_frame.T_world_frame)
             frame_viz("right_foot_frame", right_frame.T_world_frame)
             frame_viz("com_frame", tf.translation_matrix(com_task.target_world))  # Convert CoM to 4x4 matrix
+
+            # Visualize forces under the feet using contact forces from the solver
+            contacts_viz(solver, ratio=3e-3, radius=0.01)
 
         # Maintain real time
         time.sleep(DT)
@@ -147,4 +245,29 @@ plt.xlabel('time [s]')
 plt.ylabel('torque [Nm]')
 plt.legend(loc='upper right', ncol=2, fontsize='small')
 plt.title('Joint torques during squatting motion')
+
+# Plot external forces after the loop exits
+left_foot_forces = np.array(left_foot_force_log)  # Convert to numpy array
+right_foot_forces = np.array(right_foot_force_log)  # Convert to numpy array
+
+plt.figure()
+plt.subplot(2, 1, 1)
+plt.plot(T, left_foot_forces[:, 2], label="Left Foot Z-Force")
+plt.plot(T, right_foot_forces[:, 2], label="Right Foot Z-Force")
+plt.xlabel('time [s]')
+plt.ylabel('Force [N]')
+plt.legend(loc='upper right', fontsize='small')
+plt.title('Vertical Forces on Feet')
+
+plt.subplot(2, 1, 2)
+plt.plot(T, left_foot_forces[:, 0], label="Left Foot X-Force")
+plt.plot(T, right_foot_forces[:, 0], label="Right Foot X-Force")
+plt.plot(T, left_foot_forces[:, 1], label="Left Foot Y-Force")
+plt.plot(T, right_foot_forces[:, 1], label="Right Foot Y-Force")
+plt.xlabel('time [s]')
+plt.ylabel('Force [N]')
+plt.legend(loc='upper right', fontsize='small')
+plt.title('Horizontal Forces on Feet')
+
+plt.tight_layout()
 plt.show()

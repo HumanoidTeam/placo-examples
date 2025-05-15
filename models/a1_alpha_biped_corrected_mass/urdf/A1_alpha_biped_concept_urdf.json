@@ -1,0 +1,1141 @@
+{
+    "links": [
+        {
+            "name": "Base_link",
+            "inertial": {
+                "origin": {
+                    "xyz": "3.46728960589162E-07 2.67258032900247E-07 -0.109045267898649",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "6.16154154498917"
+                },
+                "inertia": {
+                    "ixx": "0.0149591362005424",
+                    "ixy": "2.00943522767814E-07",
+                    "ixz": "2.69528460007859E-08",
+                    "iyy": "0.0130209795310268",
+                    "iyz": "1.57018371725409E-08",
+                    "izz": "0.0116195508871225"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Base_link.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Base_link.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hip_FE_R",
+            "inertial": {
+                "origin": {
+                    "xyz": "0.00132215087710046 -0.00844428381651104 0.0514383742557954",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "1.1828006369853"
+                },
+                "inertia": {
+                    "ixx": "0.00295376764901796",
+                    "ixy": "4.24751867822398E-11",
+                    "ixz": "1.72009200265484E-11",
+                    "iyy": "0.00296665052058258",
+                    "iyz": "0.000227323584823247",
+                    "izz": "0.00240795950462739"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_FE_R.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_FE_R.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hip_AA_R",
+            "inertial": {
+                "origin": {
+                    "xyz": "-0.0193488887854351 -5.0471264378682E-06 -0.0299595110626561",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "2.1271338482045"
+                },
+                "inertia": {
+                    "ixx": "0.00299417226798126",
+                    "ixy": "-2.4228326166518E-07",
+                    "ixz": "-2.09071585272983E-08",
+                    "iyy": "0.0032973876228989",
+                    "iyz": "-1.35143212952141E-07",
+                    "izz": "0.00484796142894257"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_AA_R.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_AA_R.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hip_Rot_R",
+            "inertial": {
+                "origin": {
+                    "xyz": "0.000461365708485911 -0.00798401878595231 0.132704304541552",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "5.6932625410586"
+                },
+                "inertia": {
+                    "ixx": "0.0262050897789326",
+                    "ixy": "1.49162375418888E-06",
+                    "ixz": "-0.000511620103269689",
+                    "iyy": "0.0304013053008017",
+                    "iyz": "-6.05127530246273E-06",
+                    "izz": "0.0107507505667321"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_Rot_R.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.792156862745098 0.819607843137255 0.933333333333333 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_Rot_R.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Knee_FE_R",
+            "inertial": {
+                "origin": {
+                    "xyz": "0.039816371637946 0.142265153128917 -0.00270685245673613",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "3.90298458248523"
+                },
+                "inertia": {
+                    "ixx": "0.0289751698782031",
+                    "ixy": "0.000122798572773677",
+                    "ixz": "1.25336911412077E-05",
+                    "iyy": "0.00525604295321008",
+                    "iyz": "-1.35468581197616E-05",
+                    "izz": "0.0328086508296491"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Knee_FE_R.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Knee_FE_R.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Ankle_FE_R",
+            "inertial": {
+                "origin": {
+                    "xyz": "1.1289E-08 1.1102E-16 1.3659E-08",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "0.12799"
+                },
+                "inertia": {
+                    "ixx": "2.1793E-05",
+                    "ixy": "-3.8184E-11",
+                    "ixz": "1.9753E-17",
+                    "iyy": "3.5201E-05",
+                    "iyz": "3.4713E-11",
+                    "izz": "1.7108E-05"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_FE_R.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.65098 0.61961 0.58824 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_FE_R.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Ankle_Roll_R",
+            "inertial": {
+                "origin": {
+                    "xyz": "-0.040551 -2.731E-08 0.042029",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "0.83206"
+                },
+                "inertia": {
+                    "ixx": "0.0030389",
+                    "ixy": "7.2635E-10",
+                    "ixz": "0.00023292",
+                    "iyy": "0.0027352",
+                    "iyz": "-7.0349E-09",
+                    "izz": "0.00060005"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_Roll_R.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.89804 0.91765 0.92941 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_Roll_R.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hip_FE_L",
+            "inertial": {
+                "origin": {
+                    "xyz": "0.00132215177799703 0.00844428381651198 0.0514383742557952",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "1.1828006369853"
+                },
+                "inertia": {
+                    "ixx": "0.00295376764901796",
+                    "ixy": "4.2475187855062E-11",
+                    "ixz": "-1.72009192181127E-11",
+                    "iyy": "0.00296665052058258",
+                    "iyz": "-0.000227323584823246",
+                    "izz": "0.00240795950462739"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_FE_L.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_FE_L.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hip_AA_L",
+            "inertial": {
+                "origin": {
+                    "xyz": "-0.0193423410150878 -1.50064390955218E-06 -0.029959511062656",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "2.1271338482045"
+                },
+                "inertia": {
+                    "ixx": "0.00297416002472068",
+                    "ixy": "2.42283261664243E-07",
+                    "ixz": "1.35143212963884E-07",
+                    "iyy": "0.00331739986615949",
+                    "iyz": "-2.09071585259676E-08",
+                    "izz": "0.00484796142894257"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_AA_L.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_AA_L.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Hip_Rot_L",
+            "inertial": {
+                "origin": {
+                    "xyz": "0.000464188637437619 0.00798365366179038 0.132702795433171",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "5.69305628120625"
+                },
+                "inertia": {
+                    "ixx": "0.0262047707576834",
+                    "ixy": "-2.02827285419155E-06",
+                    "ixz": "-0.000511979063876991",
+                    "iyy": "0.0304007813415183",
+                    "iyz": "5.8899950853173E-06",
+                    "izz": "0.0107504711348813"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_Rot_L.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.792156862745098 0.819607843137255 0.933333333333333 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Hip_Rot_L.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Knee_FE_L",
+            "inertial": {
+                "origin": {
+                    "xyz": "0.0398163511790115 0.142265118132011 0.00270685212346858",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "3.90298517511772"
+                },
+                "inertia": {
+                    "ixx": "0.0289751725713778",
+                    "ixy": "0.000122802891205121",
+                    "ixz": "-1.25350353292297E-05",
+                    "iyy": "0.00525604025000319",
+                    "iyz": "1.35465189589164E-05",
+                    "izz": "0.032808650834456"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Knee_FE_L.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.898039215686275 0.917647058823529 0.929411764705882 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Knee_FE_L.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Ankle_FE_L",
+            "inertial": {
+                "origin": {
+                    "xyz": "1.1289E-08 0 1.3659E-08",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "0.12799"
+                },
+                "inertia": {
+                    "ixx": "2.1793E-05",
+                    "ixy": "-3.8184E-11",
+                    "ixz": "1.9717E-17",
+                    "iyy": "3.5201E-05",
+                    "iyz": "3.4713E-11",
+                    "izz": "1.7108E-05"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_FE_L.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.65098 0.61961 0.58824 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_FE_L.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Ankle_Roll_L",
+            "inertial": {
+                "origin": {
+                    "xyz": "-0.040551 -2.731E-08 0.042029",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "0.83206"
+                },
+                "inertia": {
+                    "ixx": "0.0030389",
+                    "ixy": "7.2635E-10",
+                    "ixz": "0.00023292",
+                    "iyy": "0.0027352",
+                    "iyz": "-7.0349E-09",
+                    "izz": "0.00060005"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_Roll_L.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.89804 0.91765 0.92941 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Ankle_Roll_L.STL"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Torso_Yaw",
+            "inertial": {
+                "origin": {
+                    "xyz": "-2.6172E-17 -4.0409E-18 0.21164",
+                    "rpy": "0 0 0"
+                },
+                "mass": {
+                    "value": "56.81"
+                },
+                "inertia": {
+                    "ixx": "1.1802",
+                    "ixy": "-1.8403E-17",
+                    "ixz": "-1.8245E-17",
+                    "iyy": "0.88266",
+                    "iyz": "-1.8564E-16",
+                    "izz": "0.50962"
+                }
+            },
+            "visual": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Torso_Yaw.STL"
+                        }
+                    },
+                    "material": {
+                        "name": "",
+                        "color": {
+                            "rgba": "0.50196 0.50196 0.50196 1"
+                        }
+                    }
+                }
+            ],
+            "collision": [
+                {
+                    "name": null,
+                    "origin": {
+                        "xyz": "0 0 0",
+                        "rpy": "0 0 0"
+                    },
+                    "geometry": {
+                        "type": "mesh",
+                        "attributes": {
+                            "filename": "../meshes/Torso_Yaw.STL"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "joints": [
+        {
+            "name": "Hip_FE_R_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Base_link"
+            },
+            "child": {
+                "link": "Hip_FE_R"
+            },
+            "origin": {
+                "xyz": "0 -0.0949999999999997 -0.135000000000001",
+                "rpy": "1.78896248329418 0 0"
+            },
+            "axis": {
+                "xyz": "0 0 -1"
+            },
+            "limit": {
+                "lower": "-3.1416",
+                "upper": "3.1416",
+                "effort": "360",
+                "velocity": "13.195"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Hip_AA_R_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Hip_FE_R"
+            },
+            "child": {
+                "link": "Hip_AA_R"
+            },
+            "origin": {
+                "xyz": "0.03 -0.0141381072379305 0.0748339089165384",
+                "rpy": "1.5707963267949 0.218166156499285 1.5707963267949"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-2.7925",
+                "upper": "0.34907",
+                "effort": "150",
+                "velocity": "14.661"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Hip_Rot_R_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Hip_AA_R"
+            },
+            "child": {
+                "link": "Hip_Rot_R"
+            },
+            "origin": {
+                "xyz": "-0.0800000000000002 0 -0.03",
+                "rpy": "3.14159263868863 1.5707963267949 0"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-3.1416",
+                "upper": "3.1416",
+                "effort": "150",
+                "velocity": "14.661"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Knee_FE_R_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Hip_Rot_R"
+            },
+            "child": {
+                "link": "Knee_FE_R"
+            },
+            "origin": {
+                "xyz": "0.0399999999999999 0 0.35",
+                "rpy": "1.5707963267949 0 3.14159265358979"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "0",
+                "upper": "2.4435",
+                "effort": "360",
+                "velocity": "13.195"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Ankle_FE_R_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Knee_FE_R"
+            },
+            "child": {
+                "link": "Ankle_FE_R"
+            },
+            "origin": {
+                "xyz": "0.0400000000000001 0.39 0",
+                "rpy": "0 0 0"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-1.5708",
+                "upper": "1.5708",
+                "effort": "90",
+                "velocity": "16.441"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Ankle_Roll_R_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Ankle_FE_R"
+            },
+            "child": {
+                "link": "Ankle_Roll_R"
+            },
+            "origin": {
+                "xyz": "0 0 0",
+                "rpy": "-1.5707963267949 0 -1.5707963267949"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-0.7854",
+                "upper": "0.7854",
+                "effort": "90",
+                "velocity": "16.441"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Hip_FE_L_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Base_link"
+            },
+            "child": {
+                "link": "Hip_FE_L"
+            },
+            "origin": {
+                "xyz": "0 0.0950000000000001 -0.135",
+                "rpy": "-1.78896248329418 0 0"
+            },
+            "axis": {
+                "xyz": "0 0 -1"
+            },
+            "limit": {
+                "lower": "-3.1416",
+                "upper": "3.1416",
+                "effort": "360",
+                "velocity": "13.195"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Hip_AA_L_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Hip_FE_L"
+            },
+            "child": {
+                "link": "Hip_AA_L"
+            },
+            "origin": {
+                "xyz": "0.0300000000000001 0.0141381072379312 0.0748339089165383",
+                "rpy": "-1.5707963267949 0.218166156499285 -1.57079632679489"
+            },
+            "axis": {
+                "xyz": "0 0 -1"
+            },
+            "limit": {
+                "lower": "-2.7925",
+                "upper": "0.34907",
+                "effort": "150",
+                "velocity": "14.661"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Hip_Rot_L_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Hip_AA_L"
+            },
+            "child": {
+                "link": "Hip_Rot_L"
+            },
+            "origin": {
+                "xyz": "-0.0800000000000002 0 -0.0299999999999995",
+                "rpy": "3.14159265358979 1.5707963267949 0"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-3.1416",
+                "upper": "3.1416",
+                "effort": "150",
+                "velocity": "14.661"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Knee_FE_L_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Hip_Rot_L"
+            },
+            "child": {
+                "link": "Knee_FE_L"
+            },
+            "origin": {
+                "xyz": "0.0400000000000004 0 0.35",
+                "rpy": "1.5707963267949 0 3.14159265358979"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "0",
+                "upper": "2.4435",
+                "effort": "360",
+                "velocity": "13.195"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Ankle_FE_L_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Knee_FE_L"
+            },
+            "child": {
+                "link": "Ankle_FE_L"
+            },
+            "origin": {
+                "xyz": "0.0400000000000002 0.39 0",
+                "rpy": "0 0 0"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-1.5708",
+                "upper": "1.5708",
+                "effort": "90",
+                "velocity": "16.441"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Ankle_Roll_L_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Ankle_FE_L"
+            },
+            "child": {
+                "link": "Ankle_Roll_L"
+            },
+            "origin": {
+                "xyz": "0 0 0",
+                "rpy": "-1.5707963267949 0 -1.5707963267949"
+            },
+            "axis": {
+                "xyz": "0 0 1"
+            },
+            "limit": {
+                "lower": "-0.7854",
+                "upper": "0.7854",
+                "effort": "90",
+                "velocity": "16.441"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        },
+        {
+            "name": "Torso_Yaw_DOF",
+            "type": "revolute",
+            "parent": {
+                "link": "Base_link"
+            },
+            "child": {
+                "link": "Torso_Yaw"
+            },
+            "origin": {
+                "xyz": "0 0 0",
+                "rpy": "0 0 0"
+            },
+            "axis": {
+                "xyz": "0 0 -1"
+            },
+            "limit": {
+                "lower": "-3.1416",
+                "upper": "3.1416",
+                "effort": "90",
+                "velocity": "16.441"
+            },
+            "dynamics": null,
+            "mimic": null,
+            "safety_controller": null,
+            "calibration": null
+        }
+    ]
+}

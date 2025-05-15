@@ -20,7 +20,8 @@ args = parser.parse_args()
 DT = 0.005  # Timestep [s]
 
 # Load robot
-model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
+# model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
+model_filename = "../models/a1_alpha_biped_corrected_mass/urdf/A1_alpha_biped_concept_urdf.urdf"
 # model_filename = "../models/sigmaban/robot.urdf"
 # model_filename = "../models/dummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
 robot = placo.HumanoidRobot(model_filename, placo.Flags.ignore_collisions)
@@ -197,10 +198,10 @@ try:
     t = 0  # Reset time variable for squatting motion
     while True:
         # Update CoM task target with sinusoidal motion
-        z_offset = -0.20 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2
-        y_offset = -0.0 * (1 - np.cos(2 * np.pi * 0.5 * t)) / 2
+        z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t)) / 2
+        y_offset = -0.0 * (1 - np.cos(2 * np.pi * 1.0 * t)) / 2
         com_task.target_world = com_init + np.array([0.0, y_offset, z_offset])  # Update CoM position
-        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -40.0, 0.0, 0.0, 0.0])
+        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -150.0, 0.0, 0.0, 0.0])
         # Solve dynamics
         result = solver.solve(True)
 

@@ -10,6 +10,10 @@ import numpy as np
 from placo_utils.visualization import robot_viz, frame_viz, contacts_viz
 from placo_utils.tf import tf  # Correct import for transformation utilities
 
+# Add PyBullet imports
+import pybullet as p
+from onshape_to_robot.simulation import Simulation
+
 # Parse arguments for visualization
 parser = argparse.ArgumentParser(description="Humanoid standing motion generator.")
 parser.add_argument('-p', '--pybullet', action='store_true', help='Enable PyBullet simulation')
@@ -89,8 +93,25 @@ robot.update_kinematics()
 # Dynamic Solver after bended-knee posture
 solver = placo.DynamicsSolver(robot)
 solver.dt = 0.005
+
 # Visualization setup
-viz = robot_viz(robot) if args.meshcat else None
+if args.pybullet:
+    # Loading the PyBullet simulation
+    import pybullet as p
+    from onshape_to_robot.simulation import Simulation
+    
+    sim = Simulation(model_filename, realTime=True, dt=DT)
+    # p.getNumJoints()
+    actual_torque_log = []  # Log for PyBullet-applied torques
+    # joint_indices = sim.getJoints()
+    # print("Number of joints:", p.getNumJoints(1))
+    # print("Joint indices:", joint_indices, "Size of joint_indices:", len(joint_indices))
+elif args.meshcat:
+    # Starting Meshcat viewer
+    viz = robot_viz(robot)
+else:
+    print("No visualization selected, use either -p or -m")
+    exit()
 
 # ---- FRAME TASKS FOR FEET ----
 # Freeze both feet: add frame tasks for detected frames
@@ -104,8 +125,10 @@ viz = robot_viz(robot) if args.meshcat else None
 
 T_world_left = placo.flatten_on_floor(robot.get_T_world_left())
 left_frame = solver.add_frame_task("left_foot", T_world_left)
+left_frame.configure("left_foot", "hard", 1e3, 1e3)
 T_world_right = placo.flatten_on_floor(robot.get_T_world_right())
 right_frame = solver.add_frame_task("right_foot", T_world_right)
+right_frame.configure("right_foot", "hard", 1e3, 1e3)
 
 # ---- CONTACTS FOR FEET ----
 # Add planar contacts for both feet
@@ -145,7 +168,7 @@ target_rotation[1, 1] = 0  # Free rotation around y-axis
 # posture_regularization_task.configure("posture", "soft", 1e-6)
 
 external_wrench_trunk  = solver.add_external_wrench_contact("trunk", "world")
-external_wrench_trunk.w_ext  = np.array([0.0, 0.0, -10.0, 0.0, 0.0, 0.0])
+external_wrench_trunk.w_ext  = np.array([0.0, 0.0, -100.0, 0.0, 0.0, 0.0])
 
 # Enable joint, velocity, and torque limits
 solver.enable_joint_limits(True)
@@ -161,8 +184,6 @@ for k in range(1000):
     robot.update_kinematics()
 solver.remove_contact(puppet)
 
-# Visualization setup
-viz = robot_viz(robot) if args.meshcat else None
 # Initialize torque and time logs
 torque_log = []
 time_log = []
@@ -175,13 +196,24 @@ right_foot_force_log = []
 print("Reaching initial posture for 5 seconds...")
 try:
     t = 0  # Time variable
-    while t < 0.25:  # Run for 0.25 seconds
+    while t < 5.0:  # Run for 0.25 seconds
         # Solve kinematics to reach the initial pose
         solver_kin.solve(True)
         robot.update_kinematics()
 
+        if args.pybullet:
+            if t < 2:
+                T_left_origin = sim.transformation("origin", "left_foot_frame")
+                T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]))
+                T_world_origin = T_world_left @ T_left_origin
+
+                sim.setRobotPose(*sim.matrixToPose(T_world_origin))
+
+            joints = {joint: robot.get_joint(joint) for joint in sim.getJoints()}
+            applied = sim.setJoints(joints)
+            sim.tick()
         # Visualization
-        if viz:
+        elif viz:
             viz.display(robot.state.q)
             frame_viz("left_foot_frame", left_frame.T_world_frame)
             frame_viz("right_foot_frame", right_frame.T_world_frame)
@@ -201,7 +233,7 @@ try:
         z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t)) / 2
         y_offset = -0.0 * (1 - np.cos(2 * np.pi * 1.0 * t)) / 2
         com_task.target_world = com_init + np.array([0.0, y_offset, z_offset])  # Update CoM position
-        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -150.0, 0.0, 0.0, 0.0])
+        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -100.0, 0.0, 0.0, 0.0])
         # Solve dynamics
         result = solver.solve(True)
 
@@ -216,8 +248,21 @@ try:
         # Update kinematics
         robot.update_kinematics()
 
+        # Update PyBullet simulation if enabled
+        if args.pybullet:
+            if t < 2:
+                T_left_origin = sim.transformation("origin", "left_foot_frame")
+                T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]))
+                T_world_origin = T_world_left @ T_left_origin
+
+                sim.setRobotPose(*sim.matrixToPose(T_world_origin))
+
+            joints = {joint: robot.get_joint(joint) for joint in sim.getJoints()}
+            applied = sim.setJoints(joints)
+            sim.tick()
+
         # Visualization
-        if viz:
+        elif viz:
             viz.display(robot.state.q)
             frame_viz("left_foot_frame", left_frame.T_world_frame)
             frame_viz("right_foot_frame", right_frame.T_world_frame)

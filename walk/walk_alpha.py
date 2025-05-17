@@ -20,11 +20,13 @@ args = parser.parse_args()
 
 DT = 0.005
 # model_filename = "../models/sigmaban/robot.urdf"
-model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
+# model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
+model_filename = "../models/a1_alpha_biped_corrected_mass/urdf/A1_alpha_biped_concept_urdf.urdf"
 # model_filename = "../models/250226_DummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
 
 # Loading the robot
 robot = placo.HumanoidRobot(model_filename)
+# robot = placo.HumanoidRobot(model_filename, placo.Flags.ignore_collisions)
 
 # Add these lines to grab the Pinocchio model and create a fresh Data container
 model = robot.model  # Pinocchio Model (no parentheses)
@@ -36,30 +38,30 @@ parameters = placo.HumanoidParameters()
 # Timing parameters
 parameters.single_support_duration = 0.6  # Duration of single support phase [s]
 parameters.single_support_timesteps = 10  # Number of planning timesteps per single support phase
-parameters.double_support_ratio = 0.3  # Ratio of double support (0.0 to 1.0)
+parameters.double_support_ratio = 0.0  # Ratio of double support (0.0 to 1.0)
 parameters.startend_double_support_ratio = 1.5  # Ratio duration of supports for starting and stopping walk
 parameters.planned_timesteps = 60  # Number of timesteps planned ahead
 parameters.replan_timesteps = 12  # Replanning each n timesteps
 
 # Posture parameters
 
-parameters.walk_com_height = 1.0 #robot.com_world().copy()[2]  # Constant height for the CoM [m]
+parameters.walk_com_height = 0.95 #robot.com_world().copy()[2]  # Constant height for the CoM [m]
 parameters.walk_foot_height = 0.04  # Height of foot rising while walking [m]
-parameters.walk_trunk_pitch = 0.15  # Trunk pitch angle [rad]
+parameters.walk_trunk_pitch = 0.0  # Trunk pitch angle [rad]
 parameters.walk_foot_rise_ratio = 0.2  # Time ratio for the foot swing plateau (0.0 to 1.0)
 
 # Feet parameters
 parameters.foot_length = 0.1576  # Foot length [m]
 parameters.foot_width = 0.092  # Foot width [m]
 parameters.feet_spacing = 0.35  # Lateral feet spacing [m]
-parameters.zmp_margin = 0.02  # ZMP margin [m]
+parameters.zmp_margin = 0.03  # ZMP margin [m]
 parameters.foot_zmp_target_x = 0.0  # Reference target ZMP position in the foot [m]
 parameters.foot_zmp_target_y = 0.0  # Reference target ZMP position in the foot [m]
 
 # Limit parameters
 parameters.walk_max_dtheta = 1  # Maximum dtheta per step [rad]
 parameters.walk_max_dy = 0.04  # Maximum dy per step [m]
-parameters.walk_max_dx_forward = 0.08  # Maximum dx per step forward [m]
+parameters.walk_max_dx_forward = 0.2  # Maximum dx per step forward [m]
 parameters.walk_max_dx_backward = 0.03  # Maximum dx per step backward [m]
 
 # Creating the kinematics solver
@@ -105,7 +107,7 @@ print(f"CoM position: {robot.com_world()}")
 repetitive_footsteps_planner = placo.FootstepsPlannerRepetitive(parameters)
 d_x = 0.1
 d_y = 0.0
-d_theta = 0.2
+d_theta = 0.0
 nb_steps = 10
 repetitive_footsteps_planner.configure(d_x, d_y, d_theta, nb_steps)
 
@@ -125,7 +127,61 @@ if args.pybullet:
     import pybullet as p
     from onshape_to_robot.simulation import Simulation
 
+    # start your sim exactly as before
     sim = Simulation(model_filename, realTime=True, dt=DT)
+    actual_torque_log = []  # Log for PyBullet-applied torques
+    # grab the body (robot) unique id  
+    robot_id = sim.robot
+
+    # now disable every self‐collision pair, using the default client  
+    num_joints = p.getNumJoints(robot_id)
+    for i in range(-1, num_joints):
+        for j in range(i+1, num_joints):
+            p.setCollisionFilterPair(
+                bodyUniqueIdA=robot_id,
+                bodyUniqueIdB=robot_id,
+                linkIndexA=i,
+                linkIndexB=j,
+                enableCollision=False
+            )
+
+    # Identify the ground ID (use hardcoded value or explicitly load the ground)
+    ground_id = 0  # Assuming the ground is the first object loaded
+    try:
+        p.getBodyInfo(ground_id)  # Verify if the ground ID exists
+        print(f"Ground Body Info: {p.getBodyInfo(ground_id)}")
+    except Exception:
+        print("Ground ID 0 not found. Ensure the ground is loaded.")
+        exit(1)
+
+    # Set friction and restitution for the ground
+    friction_value = 0.5  # Lateral friction
+    spinning_friction = 0.5  # default 0.0
+    rolling_friction = 0.0 # default 0.0
+    restitution = 0.0 # default 0.0
+    p.changeDynamics(
+        ground_id, -1,
+        lateralFriction=friction_value,
+        spinningFriction=spinning_friction,
+        rollingFriction=rolling_friction,
+        restitution=restitution
+    )
+    # print(f"Set ground dynamics: lateralFriction={friction_value}, spinningFriction={spinning_friction}, rollingFriction={rolling_friction}, restitution={restitution}")
+
+    # Set friction and restitution for specific robot links
+    target_links = ["Ankle_Roll_R", "Ankle_Roll_L"]
+    for joint_index in range(p.getNumJoints(robot_id)):
+        link_name = p.getJointInfo(robot_id, joint_index)[12].decode("utf-8")
+        if link_name in target_links:
+            p.changeDynamics(
+                robot_id, joint_index,
+                lateralFriction=friction_value,
+                spinningFriction=spinning_friction,
+                rollingFriction=rolling_friction,
+                restitution=restitution
+            )
+            print(f"Set dynamics for {link_name}: lateralFriction={friction_value}, spinningFriction={spinning_friction}, rollingFriction={rolling_friction}, restitution={restitution}")
+
 elif args.meshcat:
     # Starting Meshcat viewer
     viz = robot_viz(robot)
@@ -143,8 +199,8 @@ time_log = []
 
 # Timestamps
 start_t = time.time()
-initial_delay = -2.0 if args.pybullet or args.meshcat else 0.0
-t = initial_delay
+initial_delay = -10.0 if args.pybullet or args.meshcat else 0.0
+t = initial_delay  # Add 10 seconds of waiting time before starting locomotion
 last_display = time.time()
 last_replan = 0
 
@@ -156,9 +212,9 @@ print(f"ZMP margin: {parameters.zmp_margin}")
 print(f"Replan timesteps: {parameters.replan_timesteps}")
 print(f"Planned timesteps: {parameters.planned_timesteps}")
 
-# Adjust parameters to ensure feasibility
-parameters.double_support_ratio = 0.1  # Increase double support ratio slightly
-parameters.zmp_margin = 0.03  # Increase ZMP margin for stability
+# # Adjust parameters to ensure feasibility
+# parameters.double_support_ratio = 0.1  # Increase double support ratio slightly
+# parameters.zmp_margin = 0.03  # Increase ZMP margin for stability
 
 # Debugging: Log initial robot state
 print("Initial robot state:")
@@ -167,7 +223,7 @@ print(f"CoM position: {robot.com_world()}")
 
 # Run the loop for a fixed duration (e.g., 10 seconds)
 start_time = time.time()
-while time.time() - start_time < 10:  # Run for 10 seconds
+while time.time() - start_time < 30:  # Run for 10 seconds
     # Updating the QP tasks from planned trajectory
     tasks.update_tasks_from_trajectory(trajectory, t)
 
@@ -230,9 +286,9 @@ while time.time() - start_time < 10:  # Run for 10 seconds
 
     # During the warmup phase, the robot is enforced to stay in the initial position
     if args.pybullet:
-        if t < -2:
+        if t < 0:
             T_left_origin = sim.transformation("origin", "left_foot_frame")
-            T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]))
+            T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.005], [0.0, 0.0, 0.0, 1.0]))
             T_world_origin = T_world_left @ T_left_origin
 
             sim.setRobotPose(*sim.matrixToPose(T_world_origin))
@@ -260,43 +316,74 @@ while time.time() - start_time < 10:  # Run for 10 seconds
     while time.time() + initial_delay < start_t + t:
         time.sleep(1e-3)
 
-# Save torque data to a CSV file after exiting the loop
-import csv
-output_file = "/home/sasa/Software/hmnd-robot/walk_torque_data.csv"
-with open(output_file, mode="w", newline="") as file:
-    writer = csv.writer(file)
-    writer.writerow(["time"] + list(robot.joint_names()))  # Header row
-    for i, tau in enumerate(torque_log):
-        writer.writerow([time_log[i]] + tau.tolist())
-print(f"Torque data saved to {output_file}")
+if args.pybullet:
+    # Save PyBullet torque data to a CSV file after exiting the loop
+    import csv
+    pybullet_output_file = "/home/sasa/Software/hmnd-robot/pybullet_torque_data.csv"
+    min_length = min(len(time_log), len(actual_torque_log))  # Ensure synchronized lengths
+    with open(pybullet_output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["time"] + [f"joint_{i}" for i in range(len(actual_torque_log[0]))])  # Header row
+        for i in range(min_length):
+            writer.writerow([time_log[i]] + actual_torque_log[i])
+    print(f"PyBullet torque data saved to {pybullet_output_file}")
 
-# Plot joint torques after the loop exits
-import matplotlib.pyplot as plt
-import numpy as np
+    # Plot PyBullet joint torques after the loop exits
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-T = np.array(time_log)
-Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+    T = np.array(time_log[:min_length])  # Use synchronized time_log
+    PyBullet_Tau = np.array(actual_torque_log[:min_length]).T  # shape: (n_joints, len(T))
 
-# Plot all joint torques
-plt.figure()
-for i, name in enumerate(robot.joint_names()):
-    plt.plot(T, Tau[i], label=name)
-plt.xlabel("time [s]")
-plt.ylabel("torque [Nm]")
-plt.legend(loc="upper right", ncol=2, fontsize="small")
-plt.title("Joint torques during motion")
-plt.show()
+    # Plot all PyBullet joint torques
+    plt.figure()
+    joint_names = list(robot.joint_names())  # Get joint names from the robot model
+    for i, name in enumerate(joint_names[:PyBullet_Tau.shape[0]]):  # Use joint names for legend
+        plt.plot(T, PyBullet_Tau[i], label=name)
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.title("PyBullet Joint Torques during Motion")
+    plt.show()
 
-# Plot only hip torques
-joint_names = list(robot.joint_names())  # Convert to Python list
-hip_joints = [name for name in joint_names if "hip" in name.lower()]
-hip_indices = [joint_names.index(name) for name in hip_joints]
+if args.meshcat:
+    # Save torque data to a CSV file after exiting the loop
+    import csv
+    output_file = "/home/sasa/Software/hmnd-robot/walk_torque_data.csv"
+    with open(output_file, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(["time"] + list(robot.joint_names()))  # Header row
+        for i, tau in enumerate(torque_log):
+            writer.writerow([time_log[i]] + tau.tolist())
+    print(f"Torque data saved to {output_file}")
 
-plt.figure()
-for i in hip_indices:
-    plt.plot(T, Tau[i], label=joint_names[i])
-plt.xlabel("time [s]")
-plt.ylabel("torque [Nm]")
-plt.legend(loc="upper right", fontsize="small")
-plt.title("Hip joint torques during motion")
-plt.show()
+    # Plot joint torques after the loop exits
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    T = np.array(time_log)
+    Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+
+    # Plot all joint torques
+    plt.figure()
+    for i, name in enumerate(robot.joint_names()):
+        plt.plot(T, Tau[i], label=name)
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.title("Joint torques during motion")
+    plt.show()
+
+    # Plot only hip torques
+    joint_names = list(robot.joint_names())  # Convert to Python list
+    hip_joints = [name for name in joint_names if "hip" in name.lower()]
+    hip_indices = [joint_names.index(name) for name in hip_joints]
+
+    plt.figure()
+    for i in hip_indices:
+        plt.plot(T, Tau[i], label=joint_names[i])
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", fontsize="small")
+    plt.title("Hip joint torques during motion")
+    plt.show()

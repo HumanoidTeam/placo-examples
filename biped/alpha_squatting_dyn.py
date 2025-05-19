@@ -158,12 +158,19 @@ right_contact.weight_moments = 1e-3
 # # Initialize the CoM task to keep the CoM at its current position
 com_init = robot.com_world().copy()  # Get the initial CoM position
 com_task = solver.add_com_task(com_init)
-com_task.configure("com", "soft", 1.0)
+com_task.configure("com", "soft", 100.0)  # Increased weight from 1.0 to 10.0
 
 # ---- TORSO ORIENTATION TASK ----
 # Add a task to keep the torso upright by maintaining its orientation
-torso_orientation = solver.add_orientation_task("trunk", np.eye(3))  # Goal is identity rotation (upright)
-torso_orientation.configure("trunk", "soft", 1.0)
+# Add a pitch orientation of 45 degrees (in radians)
+pitch_angle = np.radians(60)  # Convert 45 degrees to radians
+pitch_rotation = np.array([
+    [np.cos(pitch_angle) , 0.0, np.sin(pitch_angle)],
+    [0.0, 1.0, 0.0],
+    [-np.sin(pitch_angle), 0.0, np.cos(pitch_angle)]
+])  # Rotation matrix for pitch
+torso_orientation = solver.add_orientation_task("Torso_Yaw", pitch_rotation)  # Goal is identity rotation (upright)
+torso_orientation.configure("Torso_Yaw", "soft", 1.0)
 
 # Define a target rotation matrix that allows free rotation around x and y axes
 target_rotation = np.eye(3)  # Identity matrix for upright orientation
@@ -234,18 +241,21 @@ try:
                     print(f"[Squat] touchdown detected at t = {squat_start_time:.2f}s")
 
         # --- 2) Compute CoM target ---
+        squat_speed_factor = 0.2  # Reduce this value to slow down squatting (e.g., 0.5 for half speed)
         if (not landed) or (t - squat_start_time < squat_delay):
             # still hanging or in post‐touchdown hang
             com_task.target_world = com_init
         else:
             # now we really start squatting
-            t_squat = t - squat_start_time - squat_delay
-            z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
-            com_task.target_world = com_init + np.array([-0.01, 0.0, z_offset])
+            t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
+            z_offset = -0.45 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
+            com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
+            print("com_task.target_world", com_task.target_world)
         if args.meshcat:
-            t_squat = t - squat_start_time - squat_delay
+            squat_speed_factor = 1.0
+            t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
             z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
-            com_task.target_world = com_init + np.array([-0.01, 0.0, z_offset])
+            com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
         external_wrench_trunk.w_ext = np.array([0.0, 0.0, external_force, 0.0, 0.0, 0.0])
 
         # Solve dynamics

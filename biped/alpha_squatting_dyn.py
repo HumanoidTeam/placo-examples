@@ -53,7 +53,7 @@ parameters.replan_timesteps = 12  # Replanning each n timesteps
 
 parameters.walk_com_height = 0.95 #robot.com_world().copy()[2]  # Constant height for the CoM [m]
 parameters.walk_foot_height = 0.04  # Height of foot rising while walking [m]
-parameters.walk_trunk_pitch = 0.05  # Trunk pitch angle [rad]
+parameters.walk_trunk_pitch = 0.0  # Trunk pitch angle [rad]
 parameters.walk_foot_rise_ratio = 0.2  # Time ratio for the foot swing plateau (0.0 to 1.0)
 
 # Feet parameters
@@ -103,9 +103,20 @@ if args.pybullet:
     sim = Simulation(model_filename, realTime=True, dt=DT)
     # p.getNumJoints()
     actual_torque_log = []  # Log for PyBullet-applied torques
-    # joint_indices = sim.getJoints()
-    # print("Number of joints:", p.getNumJoints(1))
-    # print("Joint indices:", joint_indices, "Size of joint_indices:", len(joint_indices))
+    # grab the body (robot) unique id  
+    robot_id = sim.robot
+
+    # now disable every self‐collision pair, using the default client  
+    num_joints = p.getNumJoints(robot_id)
+    for i in range(-1, num_joints):
+        for j in range(i+1, num_joints):
+            p.setCollisionFilterPair(
+                bodyUniqueIdA=robot_id,
+                bodyUniqueIdB=robot_id,
+                linkIndexA=i,
+                linkIndexB=j,
+                enableCollision=False
+            )
 elif args.meshcat:
     # Starting Meshcat viewer
     viz = robot_viz(robot)
@@ -150,8 +161,8 @@ com_task.configure("com", "soft", 1.0)
 
 # ---- TORSO ORIENTATION TASK ----
 # Add a task to keep the torso upright by maintaining its orientation
-# torso_orientation = solver.add_orientation_task("trunk", np.eye(3))  # Goal is identity rotation (upright)
-# torso_orientation.configure("trunk", "soft", 1.0)
+torso_orientation = solver.add_orientation_task("trunk", np.eye(3))  # Goal is identity rotation (upright)
+torso_orientation.configure("trunk", "soft", 1.0)
 
 # Define a target rotation matrix that allows free rotation around x and y axes
 target_rotation = np.eye(3)  # Identity matrix for upright orientation
@@ -168,7 +179,7 @@ base_orientation.configure("Base_link", "soft", 1.0)  # Constrain only z-axis ro
 # posture_regularization_task.configure("posture", "soft", 1e-6)
 
 external_wrench_trunk  = solver.add_external_wrench_contact("trunk", "world")
-external_wrench_trunk.w_ext  = np.array([0.0, 0.0, -10.0, 0.0, 0.0, 0.0])
+external_wrench_trunk.w_ext  = np.array([0.0, 0.0, -150.0, 0.0, 0.0, 0.0])
 
 # Enable joint, velocity, and torque limits
 solver.enable_joint_limits(True)
@@ -226,14 +237,36 @@ right_foot_force_log = []
 
 # Main loop: Start squatting motion
 print("Starting squatting motion. Press Ctrl+C to exit.")
+
+landed = False
+squat_start_time = None
+squat_delay = 5.0         # how long to wait after touchdown
+force_threshold = 20.0    # N, tune this to your contact model
+t = 0.0
 try:
-    t = 0  # Reset time variable for squatting motion
     while True:
-        # Update CoM task target with sinusoidal motion
-        z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t)) / 2
-        y_offset = -0.0 * (1 - np.cos(2 * np.pi * 1.0 * t)) / 2
-        com_task.target_world = com_init + np.array([-0.01, y_offset, z_offset])  # Update CoM position
-        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -100.0, 0.0, 0.0, 0.0])
+         # --- 1) Detect landing ---
+        if not landed:
+            # Option A: if you have a trajectory object:
+            # landed = trajectory.support_is_both(t)
+            # Option B: use actual contact forces:
+            fL = left_contact.wrench[2]
+            fR = right_contact.wrench[2]
+            if fL > force_threshold and fR > force_threshold:
+                landed = True
+                squat_start_time = t
+                print(f"[Squat] touchdown detected at t = {squat_start_time:.2f}s")
+
+        # --- 2) Compute CoM target ---
+        if (not landed) or (t - squat_start_time < squat_delay):
+            # still hanging or in post‐touchdown hang
+            com_task.target_world = com_init
+        else:
+            # now we really start squatting
+            t_squat = t - squat_start_time - squat_delay
+            z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
+            com_task.target_world = com_init + np.array([-0.01, 0.0, z_offset])
+        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -150.0, 0.0, 0.0, 0.0])
         # Solve dynamics
         result = solver.solve(True)
 
@@ -252,7 +285,7 @@ try:
         if args.pybullet:
             if t < 2:
                 T_left_origin = sim.transformation("origin", "left_foot_frame")
-                T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]))
+                T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.005], [0.0, 0.0, 0.0, 1.0]))
                 T_world_origin = T_world_left @ T_left_origin
 
                 sim.setRobotPose(*sim.matrixToPose(T_world_origin))

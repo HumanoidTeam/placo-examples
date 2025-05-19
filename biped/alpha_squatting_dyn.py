@@ -18,6 +18,7 @@ from onshape_to_robot.simulation import Simulation
 parser = argparse.ArgumentParser(description="Humanoid standing motion generator.")
 parser.add_argument('-p', '--pybullet', action='store_true', help='Enable PyBullet simulation')
 parser.add_argument('-m', '--meshcat', action='store_true', help='Enable MeshCat visualization')
+parser.add_argument('--external_force', type=float, default=0.0, help='External force applied to the trunk in N')
 args = parser.parse_args()
 
 # Simulation parameters
@@ -179,7 +180,7 @@ base_orientation.configure("Base_link", "soft", 1.0)  # Constrain only z-axis ro
 # posture_regularization_task.configure("posture", "soft", 1e-6)
 
 external_wrench_trunk  = solver.add_external_wrench_contact("trunk", "world")
-external_wrench_trunk.w_ext  = np.array([0.0, 0.0, -150.0, 0.0, 0.0, 0.0])
+external_wrench_trunk.w_ext  = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 
 # Enable joint, velocity, and torque limits
 solver.enable_joint_limits(True)
@@ -200,40 +201,8 @@ torque_log = []
 time_log = []
 
 # Initialize force logs
-left_foot_force_log = []
-right_foot_force_log = []
-
-# # Main loop: First reach the initial posture for 5 seconds
-# print("Reaching initial posture for 5 seconds...")
-# try:
-#     t = 0  # Time variable
-#     while t < 5.0:  # Run for 0.25 seconds
-#         # Solve kinematics to reach the initial pose
-#         solver_kin.solve(True)
-#         robot.update_kinematics()
-
-#         if args.pybullet:
-#             if t < 2:
-#                 T_left_origin = sim.transformation("origin", "left_foot_frame")
-#                 T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0]))
-#                 T_world_origin = T_world_left @ T_left_origin
-
-#                 sim.setRobotPose(*sim.matrixToPose(T_world_origin))
-
-#             joints = {joint: robot.get_joint(joint) for joint in sim.getJoints()}
-#             applied = sim.setJoints(joints)
-#             sim.tick()
-#         # Visualization
-#         elif viz:
-#             viz.display(robot.state.q)
-#             frame_viz("left_foot_frame", left_frame.T_world_frame)
-#             frame_viz("right_foot_frame", right_frame.T_world_frame)
-
-#         # Maintain real time
-#         time.sleep(DT)
-#         t += DT  # Increment time
-# except KeyboardInterrupt:
-#     print("Exiting.")
+placo_left_foot_force_log = []  # For PlaCo 3D forces
+placo_right_foot_force_log = []  # For PlaCo 3D forces
 
 # Main loop: Start squatting motion
 print("Starting squatting motion. Press Ctrl+C to exit.")
@@ -243,19 +212,26 @@ squat_start_time = None
 squat_delay = 5.0         # how long to wait after touchdown
 force_threshold = 20.0    # N, tune this to your contact model
 t = 0.0
+
+external_force = args.external_force  # Get the external force from the command-line argument
+
 try:
     while True:
-         # --- 1) Detect landing ---
+        # --- 1) Detect landing ---
         if not landed:
-            # Option A: if you have a trajectory object:
-            # landed = trajectory.support_is_both(t)
-            # Option B: use actual contact forces:
-            fL = left_contact.wrench[2]
-            fR = right_contact.wrench[2]
-            if fL > force_threshold and fR > force_threshold:
+            if args.meshcat:
+                # Skip force sensing and proceed immediately for MeshCat
                 landed = True
                 squat_start_time = t
-                print(f"[Squat] touchdown detected at t = {squat_start_time:.2f}s")
+                print(f"[Squat] proceeding immediately with MeshCat at t = {squat_start_time:.2f}s")
+            else:
+                # Use actual contact forces for PyBullet
+                fL = left_contact.wrench[2]
+                fR = right_contact.wrench[2]
+                if fL > force_threshold and fR > force_threshold:
+                    landed = True
+                    squat_start_time = t
+                    print(f"[Squat] touchdown detected at t = {squat_start_time:.2f}s")
 
         # --- 2) Compute CoM target ---
         if (not landed) or (t - squat_start_time < squat_delay):
@@ -266,7 +242,12 @@ try:
             t_squat = t - squat_start_time - squat_delay
             z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
             com_task.target_world = com_init + np.array([-0.01, 0.0, z_offset])
-        external_wrench_trunk.w_ext = np.array([0.0, 0.0, -150.0, 0.0, 0.0, 0.0])
+        if args.meshcat:
+            t_squat = t - squat_start_time - squat_delay
+            z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
+            com_task.target_world = com_init + np.array([-0.01, 0.0, z_offset])
+        external_wrench_trunk.w_ext = np.array([0.0, 0.0, external_force, 0.0, 0.0, 0.0])
+
         # Solve dynamics
         result = solver.solve(True)
 
@@ -274,15 +255,36 @@ try:
         time_log.append(t)
         torque_log.append(result.tau.copy())
 
-        # Log external forces on the feet
-        left_foot_force_log.append(left_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
-        right_foot_force_log.append(right_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
+        # Log external forces on the feet (PlaCo)
+        placo_left_foot_force_log.append(left_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
+        placo_right_foot_force_log.append(right_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
 
         # Update kinematics
         robot.update_kinematics()
 
         # Update PyBullet simulation if enabled
         if args.pybullet:
+            # Get the trunk link index using PyBullet's API
+            trunk_link_index = None
+
+            for i in range(p.getNumJoints(robot_id)):
+                joint_info = p.getJointInfo(robot_id, i)
+                link_name = joint_info[12].decode("utf-8")
+                if link_name == "trunk":
+                    trunk_link_index = i
+
+            if trunk_link_index is None:
+                raise ValueError("Trunk link not found in the robot model.")
+
+            # Apply external force to the trunk in PyBullet
+            p.applyExternalForce(
+                objectUniqueId=robot_id,
+                linkIndex=trunk_link_index,
+                forceObj=[0.0, 0.0, external_force],  # Use the parameterized external force
+                posObj=[0.0, 0.0, 0.0],  # Apply at the center of mass
+                flags=p.WORLD_FRAME
+            )
+
             if t < 2:
                 T_left_origin = sim.transformation("origin", "left_foot_frame")
                 T_world_left = sim.poseToMatrix(([0.0, 0.0, 0.005], [0.0, 0.0, 0.0, 1.0]))
@@ -367,28 +369,44 @@ if args.meshcat:
     plt.legend(loc='upper right', ncol=2, fontsize='small')
     plt.title('Joint torques during squatting motion')
 
-    # Plot external forces after the loop exits
-    left_foot_forces = np.array(left_foot_force_log)  # Convert to numpy array
-    right_foot_forces = np.array(right_foot_force_log)  # Convert to numpy array
+    # Plot PlaCo forces after the loop exits
+    T = np.array(time_log)
+    placo_left_foot_forces = np.array(placo_left_foot_force_log)  # Convert to numpy array
+    placo_right_foot_forces = np.array(placo_right_foot_force_log)  # Convert to numpy array
 
     plt.figure()
     plt.subplot(2, 1, 1)
-    plt.plot(T, left_foot_forces[:, 2], label="Left Foot Z-Force")
-    plt.plot(T, right_foot_forces[:, 2], label="Right Foot Z-Force")
+    plt.plot(T, placo_left_foot_forces[:, 2], label="Left Foot Z-Force (PlaCo)")
+    plt.plot(T, placo_right_foot_forces[:, 2], label="Right Foot Z-Force (PlaCo)")
     plt.xlabel('time [s]')
     plt.ylabel('Force [N]')
     plt.legend(loc='upper right', fontsize='small')
-    plt.title('Vertical Forces on Feet')
+    plt.title('Vertical Forces on Feet (PlaCo)')
 
     plt.subplot(2, 1, 2)
-    plt.plot(T, left_foot_forces[:, 0], label="Left Foot X-Force")
-    plt.plot(T, right_foot_forces[:, 0], label="Right Foot X-Force")
-    plt.plot(T, left_foot_forces[:, 1], label="Left Foot Y-Force")
-    plt.plot(T, right_foot_forces[:, 1], label="Right Foot Y-Force")
+    plt.plot(T, placo_left_foot_forces[:, 0], label="Left Foot X-Force (PlaCo)")
+    plt.plot(T, placo_right_foot_forces[:, 0], label="Right Foot X-Force (PlaCo)")
+    plt.plot(T, placo_left_foot_forces[:, 1], label="Left Foot Y-Force (PlaCo)")
+    plt.plot(T, placo_right_foot_forces[:, 1], label="Right Foot Y-Force (PlaCo)")
     plt.xlabel('time [s]')
     plt.ylabel('Force [N]')
     plt.legend(loc='upper right', fontsize='small')
-    plt.title('Horizontal Forces on Feet')
+    plt.title('Horizontal Forces on Feet (PlaCo)')
 
     plt.tight_layout()
+    plt.show()
+
+if args.meshcat or args.pybullet:
+    # Plot contact forces from PlaCo
+    T = np.array(time_log)
+    left_contact_forces = [force[2] for force in placo_left_foot_force_log]  # Z-force for left foot
+    right_contact_forces = [force[2] for force in placo_right_foot_force_log]  # Z-force for right foot
+
+    plt.figure()
+    plt.plot(T, left_contact_forces, label="Left Foot Z-Force (PlaCo)")
+    plt.plot(T, right_contact_forces, label="Right Foot Z-Force (PlaCo)")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Z-Force [N]")
+    plt.legend(loc="upper right", fontsize="small")
+    plt.title("Vertical Contact Forces on Feet (PlaCo)")
     plt.show()

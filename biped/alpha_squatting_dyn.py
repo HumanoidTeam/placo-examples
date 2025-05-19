@@ -342,9 +342,20 @@ if args.pybullet:
     T = np.array(time_log[:min_length])  # Use synchronized time_log
     PyBullet_Tau = np.array(actual_torque_log[:min_length]).T  # shape: (n_joints, len(T))
 
+    # Bar plot for average joint torques
+    plt.figure(figsize=(12, 6))
+    joint_names = list(robot.joint_names())  # Get joint names from the robot model
+    avg_torques = [np.mean(PyBullet_Tau[i]) for i in range(PyBullet_Tau.shape[0])]  # Compute average torques
+    plt.bar(joint_names, avg_torques, alpha=0.8)
+    plt.xlabel("Joint Names")
+    plt.ylabel("Average Torque [Nm]")
+    plt.title("Average Joint Torques (PyBullet)")
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.show()
+
     # Plot all PyBullet joint torques
     plt.figure()
-    joint_names = list(robot.joint_names())  # Get joint names from the robot model
     for i, name in enumerate(joint_names[:PyBullet_Tau.shape[0]]):  # Use joint names for legend
         plt.plot(T, PyBullet_Tau[i], label=name)
     plt.xlabel("time [s]")

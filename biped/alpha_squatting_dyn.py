@@ -27,6 +27,7 @@ DT = 0.005  # Timestep [s]
 # Load robot
 # model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
 model_filename = "../models/a1_alpha_biped_corrected_mass/urdf/A1_alpha_biped_concept_urdf.urdf"
+# model_filename = "../models/a1_withPayload/urdf/A1_alpha_biped_concept_urdf.urdf"
 # model_filename = "../models/sigmaban/robot.urdf"
 # model_filename = "../models/dummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
 robot = placo.HumanoidRobot(model_filename, placo.Flags.ignore_collisions)
@@ -222,6 +223,16 @@ t = 0.0
 
 external_force = args.external_force  # Get the external force from the command-line argument
 
+# # Confirming the center of the convex hull position
+# foot_positions = np.array([
+#     left_frame.T_world_frame[:2, 3],
+#     right_frame.T_world_frame[:2, 3]
+# ])
+
+# # Compute the center as the average (midpoint)
+# center_of_hull = np.mean(foot_positions, axis=0)
+# print(f"Center of Convex Hull (x, y): {center_of_hull}")
+
 try:
     while True:
         # --- 1) Detect landing ---
@@ -250,7 +261,6 @@ try:
             t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
             z_offset = -0.45 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
             com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
-            print("com_task.target_world", com_task.target_world)
         if args.meshcat:
             squat_speed_factor = 1.0
             t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
@@ -302,7 +312,14 @@ try:
 
                 sim.setRobotPose(*sim.matrixToPose(T_world_origin))
 
-            joints = {joint: robot.get_joint(joint) for joint in sim.getJoints()}
+            # Safely retrieve joint values, ignoring problematic joints
+            joints = {}
+            for joint in sim.getJoints():
+                try:
+                    joints[joint] = robot.get_joint(joint)
+                except Exception as e:
+                    print(f"Warning: Could not retrieve value for joint '{joint}': {e}")
+
             applied = sim.setJoints(joints)
             sim.tick()
 
@@ -352,25 +369,44 @@ if args.pybullet:
     T = np.array(time_log[:min_length])  # Use synchronized time_log
     PyBullet_Tau = np.array(actual_torque_log[:min_length]).T  # shape: (n_joints, len(T))
 
+    # Ensure joint names are aligned with PyBullet joint indices
+    pybullet_joint_names = []
+    for i in range(p.getNumJoints(robot_id)):
+        joint_info = p.getJointInfo(robot_id, i)
+        if joint_info[2] != p.JOINT_FIXED:  # Skip fixed joints
+            pybullet_joint_names.append(joint_info[1].decode("utf-8"))
+    
     # Filter data to consider values starting 0.5 seconds after landing
     start_index = next(i for i, t in enumerate(T) if t >= 2.05)  # 2s landing + 0.05s buffer
     filtered_T = T[start_index:]
     filtered_Tau = PyBullet_Tau[:, start_index:]
 
+
+    # Sort joint names to group left and right joints together
+    def sort_joints(joint_name):
+        if "_L" in joint_name:
+            return joint_name.replace("_L", "") + "_1"  # Sort left joints first
+        elif "_R" in joint_name:
+            return joint_name.replace("_R", "") + "_2"  # Sort right joints second
+        return joint_name + "_0"  # Sort other joints (e.g., torso) first
+
+    sorted_indices = sorted(range(len(pybullet_joint_names)), key=lambda i: sort_joints(pybullet_joint_names[i]))
+    pybullet_joint_names = [pybullet_joint_names[i] for i in sorted_indices]
+    filtered_Tau = filtered_Tau[sorted_indices]  # Reorder torques to match sorted joint names
+
     # Bar plot for RMS joint torques with max and min values
     plt.figure(figsize=(12, 6))
-    joint_names = list(robot.joint_names())  # Get joint names from the robot model
     rms_torques = [np.sqrt(np.mean(filtered_Tau[i]**2)) for i in range(filtered_Tau.shape[0])]  # Compute RMS torques
     max_torques = [np.max(filtered_Tau[i]) for i in range(filtered_Tau.shape[0])]  # Compute max torques
     min_torques = [np.min(filtered_Tau[i]) for i in range(filtered_Tau.shape[0])]  # Compute min torques
 
-    plt.bar(joint_names, rms_torques, alpha=0.8)
+    plt.bar(pybullet_joint_names, rms_torques, alpha=0.8)
     plt.xlabel("Joint Names")
     plt.ylabel("RMS Torque [Nm]")
     plt.title("RMS Joint Torques (PyBullet, After Landing)")
 
     # Annotate max and min values below each bar
-    for i, name in enumerate(joint_names):
+    for i, name in enumerate(pybullet_joint_names):
         plt.text(i, rms_torques[i] + 0.1, f"Max: {max_torques[i]:.2f}\nMin: {min_torques[i]:.2f}",
                  ha='center', va='bottom', fontsize=8)
 
@@ -380,7 +416,7 @@ if args.pybullet:
 
     # Plot all PyBullet joint torques
     plt.figure()
-    for i, name in enumerate(joint_names[:filtered_Tau.shape[0]]):  # Use joint names for legend
+    for i, name in enumerate(pybullet_joint_names):  # Use PyBullet joint names for legend
         plt.plot(filtered_T, filtered_Tau[i], label=name)
     plt.xlabel("time [s]")
     plt.ylabel("torque [Nm]")
@@ -395,10 +431,13 @@ if args.meshcat:
 
     T = np.array(time_log)
     Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+    Tau_actuated = Tau[6:, :] # Very important!!! By default PlaCo does not mask out the 6 DOF floating base
+    print("   Tau rows: ", Tau.shape[0])
+    print(" joint names:", len(robot.joint_names()))
 
     plt.figure()
     for i, name in enumerate(robot.joint_names()):
-        plt.plot(T, Tau[i], label=name)
+        plt.plot(T, Tau_actuated[i], label=name)
     plt.xlabel('time [s]')
     plt.ylabel('torque [Nm]')
     plt.legend(loc='upper right', ncol=2, fontsize='small')

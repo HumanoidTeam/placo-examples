@@ -371,6 +371,68 @@ except KeyboardInterrupt:
     print("Exiting.")
 
 
+# Utility functions for plotting torque data
+def time_series_plot(time, data, labels, out_dir, name="torque"):
+    """
+    Creates one PNG per joint: torque vs time.
+    `data` is (T, J), `labels` is length-J list of joint names.
+    """
+    import os
+    os.makedirs(out_dir, exist_ok=True)
+    for j, label in enumerate(labels):
+        plt.figure(figsize=(8, 4))
+        plt.plot(time, data[:, j], label=label)
+        plt.title(f"{name.capitalize()} Time Series: {label}")
+        plt.xlabel("Time (s)")
+        plt.ylabel(f"{name.capitalize()} (Nm)")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(f"{out_dir}/{label}_timeseries.png")
+        plt.close()
+
+def histogram_violin_plots(data, labels, out_dir, name="torque"):
+    """
+    - A histogram per joint in out_dir/hist/
+    - One big violin plot in out_dir/violin.png
+    """
+    import os, seaborn as sns, pandas as pd
+    os.makedirs(out_dir + "/hist", exist_ok=True)
+
+    # Histograms
+    for j, label in enumerate(labels):
+        vals = data[:, j]
+        bins = np.arange(vals.min(), vals.max() + 5, 5)
+        plt.figure(figsize=(6, 4))
+        plt.hist(vals, bins=bins, edgecolor="black")
+        plt.title(f"{name.capitalize()} Histogram: {label}")
+        plt.xlabel(f"{name.capitalize()} (Nm)")
+        plt.ylabel("Count")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(f"{out_dir}/hist/{label}_hist.png")
+        plt.close()
+
+     # 1) set a nice background/grid
+    # sns.set(style="whitegrid", font_scale=1.2)
+
+    # 2) make a DataFrame for seaborn
+    df = pd.DataFrame(data, columns=labels).melt(var_name="Joint", value_name=name.capitalize())
+
+    # 3) pick a distinct color for each joint
+    palette = sns.color_palette("husl", len(labels))
+
+    # 4) plot with palette, interior box, and a little 'cut' on the tails
+    plt.figure(figsize=(1.7 * len(labels), 6))
+    ax = sns.violinplot(
+        x="Joint", y=name.capitalize(), data=df,
+        inner="box", cut=2, palette=palette
+    )
+    plt.xticks(rotation=45, ha="right")
+    plt.title(f"{name.capitalize()} Distribution")
+    plt.tight_layout()
+    plt.savefig(f"{out_dir}/violin_{name}.png")
+    plt.close()
+
 if args.pybullet:
     import csv
     pybullet_output_file = "/home/sasa/Software/hmnd-robot/pybullet_squat_torque_data.csv"
@@ -522,6 +584,35 @@ if args.meshcat:
 
     plt.tight_layout()
     plt.show()
+
+if args.meshcat or args.pybullet:
+    # Normalize data shapes
+    T = np.array(time_log)
+    Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+    Tau_actuated = Tau[6:]  # Strip off the floating base (first 6 columns)
+    joint_names = robot.joint_names()
+
+    # Sort joint names to group left and right joints together
+    def sort_joints(joint_name):
+        if "_L" in joint_name:
+            return joint_name.replace("_L", "") + "_1"  # Sort left joints first
+        elif "_R" in joint_name:
+            return joint_name.replace("_R", "") + "_2"  # Sort right joints second
+        return joint_name + "_0"  # Sort other joints (e.g., torso) first
+
+    sorted_indices = sorted(range(len(joint_names)), key=lambda i: sort_joints(joint_names[i]))
+    sorted_joint_names = [joint_names[i] for i in sorted_indices]
+    Tau_actuated_sorted = Tau_actuated[sorted_indices]  # Reorder torques to match sorted joint names
+
+    # Determine the output directory based on the visualization mode
+    if args.pybullet:
+        plot_dir = "plots/pybullet_torques"
+    elif args.meshcat:
+        plot_dir = "plots/meshcat_torques"
+
+    # Generate plots for torques
+    time_series_plot(T, Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
+    histogram_violin_plots(Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
 
 if args.meshcat or args.pybullet:
     # Plot contact forces from PlaCo

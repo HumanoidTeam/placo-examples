@@ -435,13 +435,46 @@ if args.meshcat:
     print("   Tau rows: ", Tau.shape[0])
     print(" joint names:", len(robot.joint_names()))
 
+    # Sort joint names to group left and right joints together
+    def sort_joints(joint_name):
+        if "_L" in joint_name:
+            return joint_name.replace("_L", "") + "_1"  # Sort left joints first
+        elif "_R" in joint_name:
+            return joint_name.replace("_R", "") + "_2"  # Sort right joints second
+        return joint_name + "_0"  # Sort other joints (e.g., torso) first
+
+    sorted_indices = sorted(range(len(robot.joint_names())), key=lambda i: sort_joints(robot.joint_names()[i]))
+    sorted_joint_names = [robot.joint_names()[i] for i in sorted_indices]
+    Tau_actuated_sorted = Tau_actuated[sorted_indices]  # Reorder torques to match sorted joint names
+
+    # Line plot for joint torques
     plt.figure()
-    for i, name in enumerate(robot.joint_names()):
-        plt.plot(T, Tau_actuated[i], label=name)
+    for i, name in enumerate(sorted_joint_names):
+        plt.plot(T, Tau_actuated_sorted[i], label=name)
     plt.xlabel('time [s]')
     plt.ylabel('torque [Nm]')
     plt.legend(loc='upper right', ncol=2, fontsize='small')
     plt.title('Joint torques during squatting motion')
+
+    # Bar plot for RMS joint torques with max and min values
+    plt.figure(figsize=(12, 6))
+    rms_torques = [np.sqrt(np.mean(Tau_actuated_sorted[i]**2)) for i in range(Tau_actuated_sorted.shape[0])]  # Compute RMS torques
+    max_torques = [np.max(Tau_actuated_sorted[i]) for i in range(Tau_actuated_sorted.shape[0])]  # Compute max torques
+    min_torques = [np.min(Tau_actuated_sorted[i]) for i in range(Tau_actuated_sorted.shape[0])]  # Compute min torques
+
+    plt.bar(sorted_joint_names, rms_torques, alpha=0.8)
+    plt.xlabel("Joint Names")
+    plt.ylabel("RMS Torque [Nm]")
+    plt.title("RMS Joint Torques (MeshCat, After Landing)")
+
+    # Annotate max and min values below each bar
+    for i, name in enumerate(sorted_joint_names):
+        plt.text(i, rms_torques[i] + 0.1, f"Max: {max_torques[i]:.2f}\nMin: {min_torques[i]:.2f}",
+                 ha='center', va='bottom', fontsize=8)
+
+    plt.xticks(rotation=90)
+    plt.tight_layout()
+    plt.show()
 
     # Plot PlaCo forces after the loop exits
     T = np.array(time_log)

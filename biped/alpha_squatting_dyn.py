@@ -26,8 +26,8 @@ DT = 0.005  # Timestep [s]
 
 # Load robot
 # model_filename = "../models/a1_alpha_biped_concept_urdf/urdf/alpha.urdf"
-model_filename = "../models/a1_alpha_biped_corrected_mass/urdf/A1_alpha_biped_concept_urdf.urdf"
-# model_filename = "../models/a1_withPayload/urdf/A1_alpha_biped_concept_urdf.urdf"
+# model_filename = "../models/a1_alpha_biped_corrected_mass/urdf/A1_alpha_biped_concept_urdf.urdf"
+model_filename = "../models/a1_withPayload/urdf/A1_alpha_biped_concept_urdf.urdf"
 # model_filename = "../models/sigmaban/robot.urdf"
 # model_filename = "../models/dummyBipedURDF/urdf/250226_DummyBipedURDF.urdf"
 robot = placo.HumanoidRobot(model_filename, placo.Flags.ignore_collisions)
@@ -119,6 +119,17 @@ if args.pybullet:
                 linkIndexB=j,
                 enableCollision=False
             )
+    
+    # Add visualization for CoM projection on the floor
+    com_marker = p.createVisualShape(
+        shapeType=p.GEOM_SPHERE,
+        radius=0.02,  # Small sphere to represent CoM projection
+        rgbaColor=[1, 0, 0, 1]  # Red color
+    )
+    com_marker_body = p.createMultiBody(
+        baseVisualShapeIndex=com_marker,
+        basePosition=[0, 0, 0]  # Initial position
+    )
 elif args.meshcat:
     # Starting Meshcat viewer
     viz = robot_viz(robot)
@@ -333,6 +344,15 @@ try:
             joint_states = p.getJointStates(1, joint_indices)
             applied_torques = [state[3] for state in joint_states]
             actual_torque_log.append(applied_torques)
+
+            # Update CoM projection marker in PyBullet
+            com_position = robot.com_world().copy()
+            com_projection = [com_position[0], com_position[1], 0.0]  # Project CoM onto the floor
+            p.resetBasePositionAndOrientation(
+                com_marker_body,
+                com_projection,
+                [0, 0, 0, 1]  # No rotation
+            )
 
         # Visualization
         elif viz:

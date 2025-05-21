@@ -572,6 +572,9 @@ if args.meshcat:
     plt.close()
 
 if args.meshcat or args.pybullet:
+    import h5py
+    import os
+
     # Normalize data shapes
     T = np.array(time_log)
     Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
@@ -595,6 +598,34 @@ if args.meshcat or args.pybullet:
         plot_dir = "plots/pybullet_plots"
     elif args.meshcat:
         plot_dir = "plots/meshcat_plots"
+
+    os.makedirs(plot_dir, exist_ok=True)
+
+    # Save data in HDF5 format
+    hdf5_file = os.path.join(plot_dir, "trial_01.h5")
+    with h5py.File(hdf5_file, "w") as h5f:
+        # Metadata
+        metadata = h5f.create_group("metadata")
+        metadata.attrs["robot_version"] = "v2"
+        metadata.attrs["mission"] = "Squatting"
+        metadata.attrs["payload"] = 5  # Example payload value
+        metadata.attrs["squat_speed"] = "slow"  # Example squat speed
+
+        # Joints data
+        joints_group = h5f.create_group("joints")
+        joint_positions = np.stack([robot.state.q[6:]] * len(T), axis=1)  # Simulated joint positions
+        joint_velocities = np.stack(joint_vel_logs, axis=1)  # Joint velocities
+        joint_accelerations = np.gradient(joint_velocities, axis=1) / DT  # Joint accelerations
+
+        for i, joint_name in enumerate(sorted_joint_names):
+            joint_group = joints_group.create_group(joint_name)
+            joint_group.create_dataset("time", data=T)
+            joint_group.create_dataset("position", data=joint_positions[i])
+            joint_group.create_dataset("velocity", data=joint_velocities[i])
+            joint_group.create_dataset("acceleration", data=joint_accelerations[i])
+            joint_group.create_dataset("torque", data=Tau_actuated_sorted[i])
+
+    print(f"HDF5 data saved to {hdf5_file}")
 
     # Generate plots for torques
     time_series_plot(T, Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")

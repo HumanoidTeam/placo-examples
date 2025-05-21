@@ -223,6 +223,9 @@ time_log = []
 placo_left_foot_force_log = []  # For PlaCo 3D forces
 placo_right_foot_force_log = []  # For PlaCo 3D forces
 
+# Initialize velocity logs
+joint_vel_logs = []
+
 # Main loop: Start squatting motion
 print("Starting squatting motion. Press Ctrl+C to exit.")
 
@@ -289,6 +292,9 @@ try:
         # Log external forces on the feet (PlaCo)
         placo_left_foot_force_log.append(left_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
         placo_right_foot_force_log.append(right_contact.wrench[:3].copy())  # Extract force (first 3 components of wrench)
+
+        # Log joint velocities
+        joint_vel_logs.append(robot.state.qd[6:].copy())  # Log actuated joint velocities
 
         # Update kinematics
         robot.update_kinematics()
@@ -370,6 +376,8 @@ try:
 except KeyboardInterrupt:
     print("Exiting.")
 
+# Convert velocity logs to a numpy array for plotting
+joint_vel_logs = np.array(joint_vel_logs).T  # shape: (n_joints, len(T))
 
 # Utility functions for plotting torque data
 def time_series_plot(time, data, labels, out_dir, name="torque"):
@@ -613,6 +621,23 @@ if args.meshcat or args.pybullet:
     # Generate plots for torques
     time_series_plot(T, Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
     histogram_violin_plots(Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
+
+    # Generate torque vs speed scatter plots
+    import os
+    scatter_dir = os.path.join(plot_dir, "torque_speed")
+    os.makedirs(scatter_dir, exist_ok=True)
+    for j, joint_name in enumerate(sorted_joint_names):
+        torque_vals = np.abs(Tau_actuated_sorted[j])
+        speed_vals = np.abs(joint_vel_logs[j])
+        plt.figure(figsize=(6, 5))
+        plt.scatter(torque_vals, speed_vals, s=2, alpha=0.5)
+        plt.title(f"Torque vs Speed: {joint_name}")
+        plt.xlabel("|Torque| (Nm)")
+        plt.ylabel("|Speed| (rad/s)")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(scatter_dir, f"{joint_name.replace('/', '_')}_torque_speed.png"), dpi=150)
+        plt.close()
 
 if args.meshcat or args.pybullet:
     # Plot contact forces from PlaCo

@@ -329,6 +329,12 @@ try:
 
                 sim.setRobotPose(*sim.matrixToPose(T_world_origin))
 
+            # Define joint_indices before using it
+            num_joints = p.getNumJoints(robot_id)  # Use robot_id for PyBullet
+            joint_indices = [
+                i for i in range(num_joints) if p.getJointInfo(robot_id, i)[2] != p.JOINT_FIXED
+            ]
+
             # Safely retrieve joint values, ignoring problematic joints
             joints = {}
             for joint in sim.getJoints():
@@ -337,17 +343,21 @@ try:
                 except Exception as e:
                     print(f"Warning: Could not retrieve value for joint '{joint}': {e}")
 
-            applied = sim.setJoints(joints)
+            # applied = sim.setJoints(joints)
+
+            tau_act = result.tau[6:]  # PlaCo’s actuated‐joint torques
+            # (make sure tau_act[i] corresponds to joint_indices[i])
+            # Send them all in one call:
+            p.setJointMotorControlArray(
+                bodyUniqueId=robot_id,
+                jointIndices=joint_indices,
+                controlMode=p.TORQUE_CONTROL,
+                forces=tau_act.tolist()
+            )
             sim.tick()
 
-            # Get all movable joint indices
-            num_joints = p.getNumJoints(1)  # Assuming robot_id is 1
-            joint_indices = [
-                i for i in range(num_joints) if p.getJointInfo(1, i)[2] != p.JOINT_FIXED
-            ]
-
             # Get joint states and extract torques
-            joint_states = p.getJointStates(1, joint_indices)
+            joint_states = p.getJointStates(robot_id, joint_indices)
             applied_torques = [state[3] for state in joint_states]
             actual_torque_log.append(applied_torques)
 

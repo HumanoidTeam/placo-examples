@@ -130,9 +130,24 @@ if args.pybullet:
         baseVisualShapeIndex=com_marker,
         basePosition=[0, 0, 0]  # Initial position
     )
+
+    # Add ZMP visualization setup
+    zmp_marker = p.createVisualShape(
+        shapeType=p.GEOM_SPHERE,
+        radius=0.02,  # Small sphere to represent ZMP
+        rgbaColor=[0, 1, 0, 1]  # Green color
+    )
+    zmp_marker_body = p.createMultiBody(
+        baseVisualShapeIndex=zmp_marker,
+        basePosition=[0, 0, 0]  # Initial position
+    )
+
 elif args.meshcat:
     # Starting Meshcat viewer
     viz = robot_viz(robot)
+    # Add ZMP visualization in MeshCat
+    zmp_frame_name = "zmp_frame"
+    # viz.viewer[zmp_frame_name].set_object()  # Initialize ZMP frame in MeshCat
 else:
     print("No visualization selected, use either -p or -m")
     exit()
@@ -226,6 +241,9 @@ placo_right_foot_force_log = []  # For PlaCo 3D forces
 # Initialize velocity logs
 joint_vel_logs = []
 
+# Initialize ZMP logs
+zmp_log = []
+
 # Main loop: Start squatting motion
 print("Starting squatting motion. Press Ctrl+C to exit.")
 
@@ -237,15 +255,15 @@ t = 0.0
 
 external_force = args.external_force  # Get the external force from the command-line argument
 
-# # Confirming the center of the convex hull position
-# foot_positions = np.array([
-#     left_frame.T_world_frame[:2, 3],
-#     right_frame.T_world_frame[:2, 3]
-# ])
+# Confirming the center of the convex hull position
+foot_positions = np.array([
+    left_frame.T_world_frame[:2, 3],
+    right_frame.T_world_frame[:2, 3]
+])
 
-# # Compute the center as the average (midpoint)
-# center_of_hull = np.mean(foot_positions, axis=0)
-# print(f"Center of Convex Hull (x, y): {center_of_hull}")
+# Compute the center as the average (midpoint)
+center_of_hull = np.mean(foot_positions, axis=0)
+print(f"Center of Convex Hull (x, y): {center_of_hull}")
 
 try:
     while True:
@@ -278,7 +296,7 @@ try:
         if args.meshcat:
             squat_speed_factor = 1.0
             t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
-            z_offset = -0.10 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
+            z_offset = -0.45 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
             com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
         external_wrench_trunk.w_ext = np.array([0.0, 0.0, external_force, 0.0, 0.0, 0.0])
 
@@ -295,6 +313,43 @@ try:
 
         # Log joint velocities
         joint_vel_logs.append(robot.state.qd[6:].copy())  # Log actuated joint velocities
+
+        # Compute ZMP
+        left_force = left_contact.wrench[:3]  # Force at left foot
+        right_force = right_contact.wrench[:3]  # Force at right foot
+        left_moment = left_contact.wrench[3:]  # Moment at left foot
+        right_moment = right_contact.wrench[3:]  # Moment at right foot
+
+        # Positions of the contact frames in the world frame
+        left_position = left_frame.T_world_frame[:3, 3]  # 3x1 position of left foot contact frame
+        right_position = right_frame.T_world_frame[:3, 3]  # 3x1 position of right foot contact frame
+
+        # Compute moments about the world origin
+        left_moment_world = left_moment + np.cross(left_position, left_force)
+        right_moment_world = right_moment + np.cross(right_position, right_force)
+
+        # Sum forces and moments
+        total_force = left_force + right_force
+        total_moment = left_moment_world + right_moment_world
+
+        if total_force[2] > 1e-3:  # Avoid division by zero
+            zmp_x = -total_moment[1] / total_force[2]
+            zmp_y = total_moment[0] / total_force[2]
+            zmp_log.append([zmp_x, zmp_y])
+        else:
+            zmp_log.append([None, None])  # Invalid ZMP when vertical force is too small
+
+        # Update ZMP visualization
+        if args.pybullet and total_force[2] > 1e-3:
+            p.resetBasePositionAndOrientation(
+                zmp_marker_body,
+                [zmp_x, zmp_y, 0.0],  # ZMP projected onto the floor
+                [0, 0, 0, 1]  # No rotation
+            )
+
+        if args.meshcat and total_force[2] > 1e-3:
+            zmp_transform = tf.translation_matrix([zmp_x, zmp_y, 0.0])  # ZMP position
+            frame_viz("zmp_frame", zmp_transform)  # Update ZMP frame in MeshCat
 
         # Update kinematics
         robot.update_kinematics()
@@ -700,3 +755,32 @@ if args.meshcat or args.pybullet:
             plt.tight_layout()
             plt.savefig(os.path.join(tracking_dir, f"{joint_name.replace('/', '_')}_torque_tracking.png"))
             plt.close()
+
+# Convert ZMP log to a numpy array for plotting
+zmp_log = np.array(zmp_log)
+
+# Save ZMP plots
+zmp_dir = os.path.join(plot_dir, "zmp")
+os.makedirs(zmp_dir, exist_ok=True)
+
+plt.figure()
+plt.plot(T, zmp_log[:, 0], label="ZMP X")
+plt.plot(T, zmp_log[:, 1], label="ZMP Y")
+plt.xlabel("Time (s)")
+plt.ylabel("ZMP (m)")
+plt.legend()
+plt.title("Zero Moment Point (ZMP) Over Time")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(os.path.join(zmp_dir, "zmp_time_series.png"))
+plt.close()
+
+plt.figure()
+plt.scatter(zmp_log[:, 0], zmp_log[:, 1], s=2, alpha=0.5)
+plt.xlabel("ZMP X (m)")
+plt.ylabel("ZMP Y (m)")
+plt.title("ZMP Trajectory")
+plt.grid(True)
+plt.tight_layout()
+plt.savefig(os.path.join(zmp_dir, "zmp_trajectory.png"))
+plt.close()

@@ -480,7 +480,7 @@ if args.pybullet:
     filtered_Tau = filtered_Tau[sorted_indices]  # Reorder torques to match sorted joint names
 
     # Save RMS joint torques plot
-    plot_dir = "plots/pybullet_torques"
+    plot_dir = "plots/pybullet_plots"
     os.makedirs(plot_dir, exist_ok=True)
     plt.figure(figsize=(12, 6))
     rms_torques = [np.sqrt(np.mean(filtered_Tau[i]**2)) for i in range(filtered_Tau.shape[0])]  # Compute RMS torques
@@ -537,7 +537,7 @@ if args.meshcat:
     Tau_actuated_sorted = Tau_actuated[sorted_indices]  # Reorder torques to match sorted joint names
 
     # Save RMS joint torques plot
-    plot_dir = "plots/meshcat_torques"
+    plot_dir = "plots/meshcat_plots"
     os.makedirs(plot_dir, exist_ok=True)
     plt.figure(figsize=(12, 6))
     rms_torques = [np.sqrt(np.mean(Tau_actuated_sorted[i]**2)) for i in range(Tau_actuated_sorted.shape[0])]  # Compute RMS torques
@@ -592,9 +592,9 @@ if args.meshcat or args.pybullet:
 
     # Determine the output directory based on the visualization mode
     if args.pybullet:
-        plot_dir = "plots/pybullet_torques"
+        plot_dir = "plots/pybullet_plots"
     elif args.meshcat:
-        plot_dir = "plots/meshcat_torques"
+        plot_dir = "plots/meshcat_plots"
 
     # Generate plots for torques
     time_series_plot(T, Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
@@ -648,3 +648,24 @@ if args.meshcat or args.pybullet:
     plt.tight_layout()
     plt.savefig(os.path.join(force_dir, "horizontal_forces.png"))
     plt.close()
+
+    # Generate torque tracking plots (only for PyBullet)
+    if args.pybullet:
+        tracking_dir = os.path.join(plot_dir, "torque_tracking")
+        os.makedirs(tracking_dir, exist_ok=True)
+        placo_torque_log = np.stack(torque_log, axis=1)[6:]  # Use PlaCo torque_log for comparison
+        placo_torque_log = placo_torque_log[sorted_indices, :min_length]  # Align with sorted joint names
+        actual_torque_log = np.array(actual_torque_log).T  # Convert to NumPy array
+        actual_torque_log = actual_torque_log[sorted_indices]  # Align with sorted joint names
+        for j, joint_name in enumerate(sorted_joint_names):
+            plt.figure(figsize=(8, 4))
+            plt.plot(T, placo_torque_log[j], label="PlaCo Torque", linestyle="--")
+            plt.plot(T, actual_torque_log[j], label="Robot Torque", linestyle="-")
+            plt.title(f"Torque Tracking: {joint_name}")
+            plt.xlabel("Time (s)")
+            plt.ylabel("Torque (Nm)")
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.path.join(tracking_dir, f"{joint_name.replace('/', '_')}_torque_tracking.png"))
+            plt.close()

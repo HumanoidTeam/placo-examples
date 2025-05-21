@@ -386,7 +386,8 @@ def time_series_plot(time, data, labels, out_dir, name="torque"):
     `data` is (T, J), `labels` is length-J list of joint names.
     """
     import os
-    os.makedirs(out_dir, exist_ok=True)
+    torque_dir = os.path.join(out_dir, "torques")
+    os.makedirs(torque_dir, exist_ok=True)
     for j, label in enumerate(labels):
         plt.figure(figsize=(8, 4))
         plt.plot(time, data[:, j], label=label)
@@ -395,7 +396,7 @@ def time_series_plot(time, data, labels, out_dir, name="torque"):
         plt.ylabel(f"{name.capitalize()} (Nm)")
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig(f"{out_dir}/{label}_timeseries.png")
+        plt.savefig(os.path.join(torque_dir, f"{label}_timeseries.png"))
         plt.close()
 
 def histogram_violin_plots(data, labels, out_dir, name="torque"):
@@ -420,20 +421,14 @@ def histogram_violin_plots(data, labels, out_dir, name="torque"):
         plt.savefig(f"{out_dir}/hist/{label}_hist.png")
         plt.close()
 
-     # 1) set a nice background/grid
-    # sns.set(style="whitegrid", font_scale=1.2)
-
-    # 2) make a DataFrame for seaborn
+    # Violin plot
     df = pd.DataFrame(data, columns=labels).melt(var_name="Joint", value_name=name.capitalize())
-
-    # 3) pick a distinct color for each joint
     palette = sns.color_palette("husl", len(labels))
 
-    # 4) plot with palette, interior box, and a little 'cut' on the tails
     plt.figure(figsize=(1.7 * len(labels), 6))
     ax = sns.violinplot(
         x="Joint", y=name.capitalize(), data=df,
-        inner="box", cut=2, palette=palette
+        hue="Joint", palette=palette, inner="box", cut=2, legend=False
     )
     plt.xticks(rotation=45, ha="right")
     plt.title(f"{name.capitalize()} Distribution")
@@ -455,6 +450,7 @@ if args.pybullet:
     # Plot PyBullet joint torques
     import matplotlib.pyplot as plt
     import numpy as np
+    import os
 
     T = np.array(time_log[:min_length])  # Use synchronized time_log
     PyBullet_Tau = np.array(actual_torque_log[:min_length]).T  # shape: (n_joints, len(T))
@@ -465,12 +461,11 @@ if args.pybullet:
         joint_info = p.getJointInfo(robot_id, i)
         if joint_info[2] != p.JOINT_FIXED:  # Skip fixed joints
             pybullet_joint_names.append(joint_info[1].decode("utf-8"))
-    
+
     # Filter data to consider values starting 0.5 seconds after landing
     start_index = next(i for i, t in enumerate(T) if t >= 2.05)  # 2s landing + 0.05s buffer
     filtered_T = T[start_index:]
     filtered_Tau = PyBullet_Tau[:, start_index:]
-
 
     # Sort joint names to group left and right joints together
     def sort_joints(joint_name):
@@ -484,7 +479,9 @@ if args.pybullet:
     pybullet_joint_names = [pybullet_joint_names[i] for i in sorted_indices]
     filtered_Tau = filtered_Tau[sorted_indices]  # Reorder torques to match sorted joint names
 
-    # Bar plot for RMS joint torques with max and min values
+    # Save RMS joint torques plot
+    plot_dir = "plots/pybullet_torques"
+    os.makedirs(plot_dir, exist_ok=True)
     plt.figure(figsize=(12, 6))
     rms_torques = [np.sqrt(np.mean(filtered_Tau[i]**2)) for i in range(filtered_Tau.shape[0])]  # Compute RMS torques
     max_torques = [np.max(filtered_Tau[i]) for i in range(filtered_Tau.shape[0])]  # Compute max torques
@@ -502,9 +499,10 @@ if args.pybullet:
 
     plt.xticks(rotation=90)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(plot_dir, "rms_joint_torques.png"))
+    plt.close()
 
-    # Plot all PyBullet joint torques
+    # Save all PyBullet joint torques plot
     plt.figure()
     for i, name in enumerate(pybullet_joint_names):  # Use PyBullet joint names for legend
         plt.plot(filtered_T, filtered_Tau[i], label=name)
@@ -512,18 +510,19 @@ if args.pybullet:
     plt.ylabel("torque [Nm]")
     plt.legend(loc="upper right", ncol=2, fontsize="small")
     plt.title("PyBullet Joint Torques during Motion (After Landing)")
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_dir, "joint_torques.png"))
+    plt.close()
 
 if args.meshcat:
     # Plot joint torques after the loop exits
     import matplotlib.pyplot as plt
     import numpy as np
+    import os
 
     T = np.array(time_log)
     Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
-    Tau_actuated = Tau[6:, :] # Very important!!! By default PlaCo does not mask out the 6 DOF floating base
-    print("   Tau rows: ", Tau.shape[0])
-    print(" joint names:", len(robot.joint_names()))
+    Tau_actuated = Tau[6:, :]  # Strip off the floating base (first 6 columns)
 
     # Sort joint names to group left and right joints together
     def sort_joints(joint_name):
@@ -537,16 +536,9 @@ if args.meshcat:
     sorted_joint_names = [robot.joint_names()[i] for i in sorted_indices]
     Tau_actuated_sorted = Tau_actuated[sorted_indices]  # Reorder torques to match sorted joint names
 
-    # Line plot for joint torques
-    plt.figure()
-    for i, name in enumerate(sorted_joint_names):
-        plt.plot(T, Tau_actuated_sorted[i], label=name)
-    plt.xlabel('time [s]')
-    plt.ylabel('torque [Nm]')
-    plt.legend(loc='upper right', ncol=2, fontsize='small')
-    plt.title('Joint torques during squatting motion')
-
-    # Bar plot for RMS joint torques with max and min values
+    # Save RMS joint torques plot
+    plot_dir = "plots/meshcat_torques"
+    os.makedirs(plot_dir, exist_ok=True)
     plt.figure(figsize=(12, 6))
     rms_torques = [np.sqrt(np.mean(Tau_actuated_sorted[i]**2)) for i in range(Tau_actuated_sorted.shape[0])]  # Compute RMS torques
     max_torques = [np.max(Tau_actuated_sorted[i]) for i in range(Tau_actuated_sorted.shape[0])]  # Compute max torques
@@ -564,34 +556,20 @@ if args.meshcat:
 
     plt.xticks(rotation=90)
     plt.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(plot_dir, "rms_joint_torques.png"))
+    plt.close()
 
-    # Plot PlaCo forces after the loop exits
-    T = np.array(time_log)
-    placo_left_foot_forces = np.array(placo_left_foot_force_log)  # Convert to numpy array
-    placo_right_foot_forces = np.array(placo_right_foot_force_log)  # Convert to numpy array
-
+    # Save all MeshCat joint torques plot
     plt.figure()
-    plt.subplot(2, 1, 1)
-    plt.plot(T, placo_left_foot_forces[:, 2], label="Left Foot Z-Force (PlaCo)")
-    plt.plot(T, placo_right_foot_forces[:, 2], label="Right Foot Z-Force (PlaCo)")
-    plt.xlabel('time [s]')
-    plt.ylabel('Force [N]')
-    plt.legend(loc='upper right', fontsize='small')
-    plt.title('Vertical Forces on Feet (PlaCo)')
-
-    plt.subplot(2, 1, 2)
-    plt.plot(T, placo_left_foot_forces[:, 0], label="Left Foot X-Force (PlaCo)")
-    plt.plot(T, placo_right_foot_forces[:, 0], label="Right Foot X-Force (PlaCo)")
-    plt.plot(T, placo_left_foot_forces[:, 1], label="Left Foot Y-Force (PlaCo)")
-    plt.plot(T, placo_right_foot_forces[:, 1], label="Right Foot Y-Force (PlaCo)")
-    plt.xlabel('time [s]')
-    plt.ylabel('Force [N]')
-    plt.legend(loc='upper right', fontsize='small')
-    plt.title('Horizontal Forces on Feet (PlaCo)')
-
+    for i, name in enumerate(sorted_joint_names):
+        plt.plot(T, Tau_actuated_sorted[i], label=name)
+    plt.xlabel("time [s]")
+    plt.ylabel("torque [Nm]")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.title("MeshCat Joint Torques during Motion (After Landing)")
     plt.tight_layout()
-    plt.show()
+    plt.savefig(os.path.join(plot_dir, "joint_torques.png"))
+    plt.close()
 
 if args.meshcat or args.pybullet:
     # Normalize data shapes
@@ -639,17 +617,34 @@ if args.meshcat or args.pybullet:
         plt.savefig(os.path.join(scatter_dir, f"{joint_name.replace('/', '_')}_torque_speed.png"), dpi=150)
         plt.close()
 
-if args.meshcat or args.pybullet:
-    # Plot contact forces from PlaCo
-    T = np.array(time_log)
-    left_contact_forces = [force[2] for force in placo_left_foot_force_log]  # Z-force for left foot
-    right_contact_forces = [force[2] for force in placo_right_foot_force_log]  # Z-force for right foot
+    # Save PlaCo forces plots
+    force_dir = os.path.join(plot_dir, "forces")
+    os.makedirs(force_dir, exist_ok=True)
+    placo_left_foot_forces = np.array(placo_left_foot_force_log)  # Convert to numpy array
+    placo_right_foot_forces = np.array(placo_right_foot_force_log)  # Convert to numpy array
 
     plt.figure()
-    plt.plot(T, left_contact_forces, label="Left Foot Z-Force (PlaCo)")
-    plt.plot(T, right_contact_forces, label="Right Foot Z-Force (PlaCo)")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Z-Force [N]")
-    plt.legend(loc="upper right", fontsize="small")
-    plt.title("Vertical Contact Forces on Feet (PlaCo)")
-    plt.show()
+    plt.subplot(2, 1, 1)
+    plt.plot(T, placo_left_foot_forces[:, 2], label="Left Foot Z-Force (PlaCo)")
+    plt.plot(T, placo_right_foot_forces[:, 2], label="Right Foot Z-Force (PlaCo)")
+    plt.xlabel('time [s]')
+    plt.ylabel('Force [N]')
+    plt.legend(loc='upper right', fontsize='small')
+    plt.title('Vertical Forces on Feet (PlaCo)')
+    plt.tight_layout()
+    plt.savefig(os.path.join(force_dir, "vertical_forces.png"))
+    plt.close()
+
+    plt.figure()
+    plt.subplot(2, 1, 1)
+    plt.plot(T, placo_left_foot_forces[:, 0], label="Left Foot X-Force (PlaCo)")
+    plt.plot(T, placo_right_foot_forces[:, 0], label="Right Foot X-Force (PlaCo)")
+    plt.plot(T, placo_left_foot_forces[:, 1], label="Left Foot Y-Force (PlaCo)")
+    plt.plot(T, placo_right_foot_forces[:, 1], label="Right Foot Y-Force (PlaCo)")
+    plt.xlabel('time [s]')
+    plt.ylabel('Force [N]')
+    plt.legend(loc='upper right', fontsize='small')
+    plt.title('Horizontal Forces on Feet (PlaCo)')
+    plt.tight_layout()
+    plt.savefig(os.path.join(force_dir, "horizontal_forces.png"))
+    plt.close()

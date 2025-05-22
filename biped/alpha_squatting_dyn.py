@@ -185,8 +185,7 @@ right_contact.weight_moments = 1e-3
 # # Initialize the CoM task to keep the CoM at its current position
 com_init = robot.com_world().copy()  # Get the initial CoM position
 com_task = solver.add_com_task(com_init)
-com_task.configure("com", "soft", 100.0)  # Increased weight from 1.0 to 10.0
-
+com_task.configure("com", "soft", 1000.0)
 # ---- TORSO ORIENTATION TASK ----
 # Add a task to keep the torso upright by maintaining its orientation
 # Add a pitch orientation of 45 degrees (in radians)
@@ -244,6 +243,15 @@ joint_vel_logs = []
 # Initialize ZMP logs
 zmp_log = []
 
+# Initialize logs for joint positions, velocities, and torques
+joint_position_log = []
+joint_velocity_log = []
+joint_torque_log = []
+
+if args.pybullet:
+    # Initialize a log for actual joint positions from PyBullet
+    actual_position_log = []
+
 # Main loop: Start squatting motion
 print("Starting squatting motion. Press Ctrl+C to exit.")
 
@@ -296,7 +304,7 @@ try:
         if args.meshcat:
             squat_speed_factor = 1.0
             t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
-            z_offset = -0.45 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
+            z_offset = -0.15 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
             com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
         external_wrench_trunk.w_ext = np.array([0.0, 0.0, external_force, 0.0, 0.0, 0.0])
 
@@ -313,6 +321,11 @@ try:
 
         # Log joint velocities
         joint_vel_logs.append(robot.state.qd[6:].copy())  # Log actuated joint velocities
+
+        # Log joint positions, velocities, and torques
+        joint_position_log.append(robot.state.q[6:].copy())  # Skip floating base (first 6 values)
+        joint_velocity_log.append(robot.state.qd.copy())  # Skip floating base
+        joint_torque_log.append(result.tau.copy())  # Torques from PlaCo
 
         # Compute ZMP
         left_force = left_contact.wrench[:3]  # Force at left foot
@@ -406,6 +419,10 @@ try:
             applied_torques = [state[3] for state in joint_states]
             actual_torque_log.append(applied_torques)
 
+            # Log actual joint positions from PyBullet
+            actual_positions = [state[0] for state in joint_states]
+            actual_position_log.append(actual_positions)
+
             # Update CoM projection marker in PyBullet
             com_position = robot.com_world().copy()
             com_projection = [com_position[0], com_position[1], 0.0]  # Project CoM onto the floor
@@ -423,13 +440,37 @@ try:
             frame_viz("com_frame", tf.translation_matrix(com_task.target_world))  # Convert CoM to 4x4 matrix
 
             # Visualize forces under the feet using contact forces from the solver
-            contacts_viz(solver, ratio=3e-3, radius=0.01)
+            contacts_viz(solver, ratio=1e-3, radius=0.01)  # Reduced ratio for smaller arrows
 
         # Maintain real time
         time.sleep(DT)
         t += DT  # Increment time
 except KeyboardInterrupt:
     print("Exiting.")
+
+# Define joint names
+joint_names = robot.joint_names()  # Convert to a Python list
+list_joint_names = list(joint_names)  # Convert to a list for CSV header
+
+# Save logs to a file (e.g., CSV) with 50Hz sampling rate
+import csv
+if args.meshcat:
+    output_file = "/home/sasa/Software/placoTests/joint_data_meshcat_50hz.csv"
+elif args.pybullet:
+    output_file = "/home/sasa/Software/placoTests/joint_data_pybullet_50hz.csv"
+sampling_interval = int(1 / (50 * DT))  # Calculate interval for 50Hz sampling
+
+# Convert actual_positions to a NumPy array if not already
+actual_positions = np.array(actual_positions)
+
+# # Use joint names and actual_positions from the measured joint positions plot
+# with open(output_file, mode="w", newline="") as file:
+#     writer = csv.writer(file)
+#     writer.writerow(["time"] + list_joint_names)  # Header row with correct joint names
+#     for i in range(0, len(time_log), sampling_interval):  # Sample every `sampling_interval` steps
+#         writer.writerow([time_log[i]] + actual_positions[i].tolist())  # Ensure actual_positions[i] is a list
+
+# print(f"Joint data saved to {output_file} at 50Hz sampling rate.")
 
 # Convert velocity logs to a numpy array for plotting
 joint_vel_logs = np.array(joint_vel_logs).T  # shape: (n_joints, len(T))
@@ -512,10 +553,17 @@ if args.pybullet:
 
     # Ensure joint names are aligned with PyBullet joint indices
     pybullet_joint_names = []
+    joint_index_to_name = {}
     for i in range(p.getNumJoints(robot_id)):
         joint_info = p.getJointInfo(robot_id, i)
         if joint_info[2] != p.JOINT_FIXED:  # Skip fixed joints
-            pybullet_joint_names.append(joint_info[1].decode("utf-8"))
+            joint_name = joint_info[1].decode("utf-8")
+            pybullet_joint_names.append(joint_name)
+            joint_index_to_name[i] = joint_name
+
+    # Sort joint names to ensure they correspond to the correct joint positions
+    sorted_joint_indices = sorted(joint_index_to_name.keys())
+    pybullet_joint_names = [joint_index_to_name[i] for i in sorted_joint_indices]
 
     # Filter data to consider values starting 0.5 seconds after landing
     start_index = next(i for i, t in enumerate(T) if t >= 2.05)  # 2s landing + 0.05s buffer
@@ -568,6 +616,83 @@ if args.pybullet:
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, "joint_torques.png"))
     plt.close()
+
+    # Plot joint position tracking
+    tracking_dir = os.path.join(plot_dir, "position_tracking")
+    os.makedirs(tracking_dir, exist_ok=True)
+
+    # Convert logs to NumPy arrays
+    commanded_positions = np.array(joint_position_log)  # Exclude floating base
+    actual_positions = np.array(actual_position_log)
+
+    # Ensure logs are synchronized
+    min_length = min(len(commanded_positions), len(actual_positions))
+    commanded_positions = commanded_positions[:min_length]
+    actual_positions = actual_positions[:min_length]
+    T = np.array(time_log[:min_length])
+
+    # Plot position tracking for each joint
+    for j, joint_name in enumerate(joint_names):
+        plt.figure(figsize=(8, 4))
+        plt.plot(T, commanded_positions[:, j], label="Commanded Position", linestyle="--")
+        plt.plot(T, actual_positions[:, j], label="Actual Position", linestyle="-")
+        plt.title(f"Position Tracking: {joint_name}")
+        plt.xlabel("Time (s)")
+        plt.ylabel("Position (rad)")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(tracking_dir, f"{joint_name.replace('/', '_')}_position_tracking.png"))
+        plt.close()
+
+    print(f"Joint position tracking plots saved to {tracking_dir}")
+
+    # Plot all joint positions in one plot
+    all_positions_plot_dir = os.path.join(plot_dir, "all_positions")
+    os.makedirs(all_positions_plot_dir, exist_ok=True)
+
+    # Plot all commanded joint positions
+    plt.figure(figsize=(12, 6))
+    for j, joint_name in enumerate(pybullet_joint_names):
+        plt.plot(T, commanded_positions[:, j], label=joint_name)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Position (rad)")
+    plt.title("Joint Positions Over Time")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(all_positions_plot_dir, "all_commanded_joint_positions.png"))
+    # plt.show()
+    plt.close()
+
+    print(f"All joint positions plot saved to {all_positions_plot_dir}")
+
+    # Plot all Measured joint positions
+    plt.figure(figsize=(12, 6))
+    for j, joint_name in enumerate(joint_names):
+        plt.plot(T, actual_positions[:, j], label=joint_name)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Position (rad)")
+    plt.title("Joint Positions Over Time")
+    plt.legend(loc="upper right", ncol=2, fontsize="small")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(all_positions_plot_dir, "all_measured_joint_positions.png"))
+    # plt.show()
+    plt.close()
+
+    print(f"All joint positions plot saved to {all_positions_plot_dir}")
+
+    sampling_interval = int(1 / (50 * DT))  # Calculate interval for 50Hz sampling
+    # Save time log and actual joint positions to a CSV file
+    csv_file_path = os.path.join(all_positions_plot_dir, "measured_joint_positions.csv")
+    with open(csv_file_path, mode="w", newline="") as csv_file:
+        writer = csv.writer(csv_file)
+        writer.writerow(["Time (s)"] + list(joint_names))  # Convert joint_names to a Python list
+        for i in range(0, len(time_log), sampling_interval):
+            writer.writerow([time_log[i]] + actual_positions[i].tolist())  # Write time and joint positions
+
+    print(f"Measured joint positions saved to {csv_file_path}")
 
 if args.meshcat:
     # Plot joint torques after the loop exits
@@ -632,9 +757,29 @@ if args.meshcat or args.pybullet:
 
     # Normalize data shapes
     T = np.array(time_log)
-    Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
-    Tau_actuated = Tau[6:]  # Strip off the floating base (first 6 columns)
     joint_names = robot.joint_names()
+
+    if args.pybullet:
+        # Use PyBullet-applied torques
+        min_length = min(len(time_log), len(actual_torque_log))  # Ensure synchronized lengths
+        PyBullet_Tau = np.array(actual_torque_log[:min_length]).T  # shape: (n_joints, len(T))
+        T = T[:min_length]  # Synchronize time array with PyBullet data
+        Tau_actuated = PyBullet_Tau  # Use PyBullet torques for further processing
+
+        # Filter torques after 0.5 seconds
+        start_index = next(i for i, t in enumerate(T) if t >= 2.5)
+        filtered_T = T[start_index:]
+        filtered_Tau = Tau_actuated[:, start_index:]  # Filtered torques for violin plot
+
+    elif args.meshcat:
+        # Use PlaCo-computed torques
+        Tau = np.stack(torque_log, axis=1)  # shape: (n_joints, len(T))
+        Tau_actuated = Tau[6:]  # Strip off the floating base (first 6 columns)
+
+        # # Filter torques after 0.5 seconds
+        # start_index = next(i for i, t in enumerate(T) if t >= 0.5)
+        # filtered_T = T[start_index:]
+        # filtered_Tau = Tau_actuated[:, start_index:]  # Filtered torques for violin plot
 
     # Sort joint names to group left and right joints together
     def sort_joints(joint_name):
@@ -684,7 +829,12 @@ if args.meshcat or args.pybullet:
 
     # Generate plots for torques
     time_series_plot(T, Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
-    histogram_violin_plots(Tau_actuated_sorted.T, sorted_joint_names, plot_dir, name="torque")
+
+    # Filter torques after 2.5 seconds
+    start_index = next(i for i, t in enumerate(T) if t >= 2.5)
+    filtered_Tau = Tau_actuated_sorted[:, start_index:]  # Filtered torques for violin plot
+
+    histogram_violin_plots(filtered_Tau.T, sorted_joint_names, plot_dir, name="torque")
 
     # Generate torque vs speed scatter plots
     import os

@@ -142,6 +142,89 @@ if args.pybullet:
         basePosition=[0, 0, 0]  # Initial position
     )
 
+    # Add visualization for the PyBullet-computed CoM
+    pybullet_com_marker = p.createVisualShape(
+        shapeType=p.GEOM_SPHERE,
+        radius=0.02,  # Small sphere to represent CoM
+        rgbaColor=[0, 0, 1, 1]  # Blue color
+    )
+    pybullet_com_marker_body = p.createMultiBody(
+        baseVisualShapeIndex=pybullet_com_marker,
+        basePosition=[0, 0, 0]  # Initial position
+    )
+
+    # Add visualization for the PyBullet-computed CoM projection
+    pybullet_com_projection_marker = p.createVisualShape(
+        shapeType=p.GEOM_SPHERE,
+        radius=0.02,  # Small sphere to represent CoM projection
+        rgbaColor=[0, 0, 1, 1]  # Blue color
+    )
+    pybullet_com_projection_body = p.createMultiBody(
+        baseVisualShapeIndex=pybullet_com_projection_marker,
+        basePosition=[0, 0, 0]  # Initial position
+    )
+
+    def get_pybullet_com_position(robot_id):
+        """Returns the center of mass (CoM) of the robot in PyBullet."""
+        k = -1
+        total_mass = 0
+        com = np.array([0.0, 0.0, 0.0])
+        while True:
+            if k == -1:
+                pos, _ = p.getBasePositionAndOrientation(robot_id)
+            else:
+                res = p.getLinkState(robot_id, k)
+                if res is None:
+                    break
+                pos = res[0]
+
+            dynamics_info = p.getDynamicsInfo(robot_id, k)
+            mass = dynamics_info[0]
+            com += np.array(pos) * mass
+            total_mass += mass
+
+            k += 1
+
+        return com / total_mass if total_mass > 0 else np.array([0.0, 0.0, 0.0])
+
+    # # Add visualization for the support polygon (rectangle)
+    # support_polygon_lines = []
+    # support_polygon_color = [0, 0, 1]  # Blue color for the rectangle
+    # support_polygon_thickness = 0.005
+
+    # def update_support_polygon(left_position, right_position):
+    #     global support_polygon_lines
+    #     # Clear previous lines
+    #     for line in support_polygon_lines:
+    #         p.removeUserDebugItem(line)
+    #     support_polygon_lines = []
+
+    #     # Define the forward and back points for both feet
+    #     half_width = parameters.foot_width / 2
+    #     half_length = parameters.foot_length / 2
+
+    #     # Forward points
+    #     left_forward = [left_position[0] + half_length, left_position[1], 0]
+    #     right_forward = [right_position[0] + half_length, right_position[1], 0]
+
+    #     # Back points
+    #     left_back = [left_position[0] - half_length, left_position[1], 0]
+    #     right_back = [right_position[0] - half_length, right_position[1], 0]
+
+    #     # Draw the forward line
+    #     try:
+    #         forward_line = p.addUserDebugLine(left_forward, right_forward, support_polygon_color, support_polygon_thickness)
+    #         support_polygon_lines.append(forward_line)
+    #     except Exception as e:
+    #         print(f"Failed to draw forward line: {e}")
+
+    #     # Draw the back line
+    #     try:
+    #         back_line = p.addUserDebugLine(left_back, right_back, support_polygon_color, support_polygon_thickness)
+    #         support_polygon_lines.append(back_line)
+    #     except Exception as e:
+    #         print(f"Failed to draw back line: {e}")
+
 elif args.meshcat:
     # Starting Meshcat viewer
     viz = robot_viz(robot)
@@ -302,9 +385,9 @@ try:
             z_offset = -0.45 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
             com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
         if args.meshcat:
-            squat_speed_factor = 1.0
+            squat_speed_factor = 0.2
             t_squat = squat_speed_factor * (t - squat_start_time - squat_delay)
-            z_offset = -0.15 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
+            z_offset = -0.35 * (1 - np.cos(2 * np.pi * 1.0 * t_squat)) / 2
             com_task.target_world = com_init + np.array([0.0, 0.0, z_offset])
         external_wrench_trunk.w_ext = np.array([0.0, 0.0, external_force, 0.0, 0.0, 0.0])
 
@@ -432,6 +515,27 @@ try:
                 [0, 0, 0, 1]  # No rotation
             )
 
+            # Update PyBullet CoM visualization
+            pybullet_com_position = get_pybullet_com_position(robot_id)
+            p.resetBasePositionAndOrientation(
+                pybullet_com_marker_body,
+                pybullet_com_position,
+                [0, 0, 0, 1]  # No rotation
+            )
+
+            # Update PyBullet CoM projection visualization
+            pybullet_com_position = get_pybullet_com_position(robot_id)
+            pybullet_com_projection = [pybullet_com_position[0], pybullet_com_position[1], 0.0]  # Project onto the ground
+            p.resetBasePositionAndOrientation(
+                pybullet_com_projection_body,
+                pybullet_com_projection,
+                [0, 0, 0, 1]  # No rotation
+            )
+
+            # Update support polygon visualization
+            # if args.pybullet:
+            #     update_support_polygon(left_position, right_position)
+
         # Visualization
         elif viz:
             viz.display(robot.state.q)
@@ -443,7 +547,7 @@ try:
             contacts_viz(solver, ratio=1e-3, radius=0.01)  # Reduced ratio for smaller arrows
 
         # Maintain real time
-        time.sleep(DT)
+        time.sleep(DT)  # Ensure real-time updates
         t += DT  # Increment time
 except KeyboardInterrupt:
     print("Exiting.")

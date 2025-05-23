@@ -9,6 +9,8 @@ import time
 import numpy as np
 from placo_utils.visualization import robot_viz, frame_viz, contacts_viz
 from placo_utils.tf import tf  # Correct import for transformation utilities
+# from meshcat import Visualizer
+# from meshcat.servers import start_zmq_server_as_process
 
 # Add PyBullet imports
 import pybullet as p
@@ -227,13 +229,22 @@ if args.pybullet:
 
 elif args.meshcat:
     # Starting Meshcat viewer
+    # server = start_zmq_server_as_process()
+    # viewer = Visualizer(zmq_url="tcp://127.0.0.1:6000") 
     viz = robot_viz(robot)
+    # Start recording at 200 Hz (1/DT)
+    # viz.start_recording(frames_per_second=1.0 / DT)
     # Add ZMP visualization in MeshCat
     zmp_frame_name = "zmp_frame"
     # viz.viewer[zmp_frame_name].set_object()  # Initialize ZMP frame in MeshCat
 else:
     print("No visualization selected, use either -p or -m")
     exit()
+
+# send visuals at 60 Hz
+VIZ_HZ = 60.0
+viz_interval = 1.0 / VIZ_HZ
+next_viz_time = time.monotonic()
 
 # ---- FRAME TASKS FOR FEET ----
 # Freeze both feet: add frame tasks for detected frames
@@ -356,8 +367,16 @@ foot_positions = np.array([
 center_of_hull = np.mean(foot_positions, axis=0)
 print(f"Center of Convex Hull (x, y): {center_of_hull}")
 
+import time
+# before the loop
+t = 0.0
+DT = 0.005
+next_frame_time = time.monotonic()
+
 try:
     while True:
+        start = time.monotonic()
+
         # --- 1) Detect landing ---
         if not landed:
             if args.meshcat:
@@ -536,21 +555,32 @@ try:
             # if args.pybullet:
             #     update_support_polygon(left_position, right_position)
 
-        # Visualization
-        elif viz:
+        # only update the MeshCat viewer at 60 Hz
+        now = time.monotonic()
+        if args.meshcat and now >= next_viz_time:
             viz.display(robot.state.q)
             frame_viz("left_foot_frame", left_frame.T_world_frame)
             frame_viz("right_foot_frame", right_frame.T_world_frame)
             frame_viz("com_frame", tf.translation_matrix(com_task.target_world))  # Convert CoM to 4x4 matrix
+            contacts_viz(solver, ratio=1e-3, radius=0.01)  # Visualize forces
+            next_viz_time += viz_interval
 
-            # Visualize forces under the feet using contact forces from the solver
-            contacts_viz(solver, ratio=1e-3, radius=0.01)  # Reduced ratio for smaller arrows
-
-        # Maintain real time
-        time.sleep(DT)  # Ensure real-time updates
+        # real-time pacing for your 200 Hz sim loop
+        next_frame_time += DT #* (60/200 * 35/60) # If actual frame-rate your browser is managing is 60Hz!
+        sleep_time = next_frame_time - time.monotonic()
+        if (sleep_time > 0):
+            time.sleep(sleep_time)
+        else:
+            # if negative, you’re behind real time—skip sleeping
+            next_frame_time = time.monotonic()
         t += DT  # Increment time
 except KeyboardInterrupt:
     print("Exiting.")
+
+    # if args.meshcat:
+    #     # Stop recording and publish the recorded frames
+    #     viz.stop_recording()
+    #     viz.publish_recording()
 
 # Define joint names
 joint_names = robot.joint_names()  # Convert to a Python list
@@ -562,10 +592,9 @@ if args.meshcat:
     output_file = "/home/sasa/Software/placoTests/joint_data_meshcat_50hz.csv"
 elif args.pybullet:
     output_file = "/home/sasa/Software/placoTests/joint_data_pybullet_50hz.csv"
+    # Convert actual_positions to a NumPy array if not already
+    actual_positions = np.array(actual_positions)
 sampling_interval = int(1 / (50 * DT))  # Calculate interval for 50Hz sampling
-
-# Convert actual_positions to a NumPy array if not already
-actual_positions = np.array(actual_positions)
 
 # # Use joint names and actual_positions from the measured joint positions plot
 # with open(output_file, mode="w", newline="") as file:
